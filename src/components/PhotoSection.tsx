@@ -32,7 +32,6 @@ export default function PhotoSection({ category, photos, onAdd, onRemove }: Phot
           type="file"
           accept="image/*"
           multiple
-          capture="environment"
           className="hidden"
           onChange={(e) => {
             if (e.target.files && e.target.files.length > 0) onAdd(e.target.files)
