@@ -16,10 +16,23 @@ import { getLocationById } from './locationService'
 // SIGNED URL TTL: 8 hours (one field shift). getPhotosForLocation is called
 // once per page visit with no refresh-on-expiry logic, so the TTL needs to
 // outlast a normal session on the Photos page rather than being tight.
+//
+// COMPRESSION: modern phone cameras produce 8-20MB+ photos. Uploading the
+// original file over a mobile/site connection was reported slow in real
+// field testing. compressImage() resizes to a max dimension and re-encodes
+// as JPEG in-browser (Canvas API, no external library) before upload —
+// applies in both modes, so mock-mode previews match what real uploads
+// will look/behave like. Falls back to the original file if compression
+// fails for any reason (e.g. an unsupported format) or doesn't actually
+// shrink the file, rather than blocking the upload outright.
 // ---------------------------------------------------------------------------
 
 const BUCKET = 'glass-railing-photos'
 const SIGNED_URL_TTL_SECONDS = 8 * 60 * 60 // 8 hours
+
+const COMPRESS_MAX_DIMENSION = 1600 // px, longest side
+const COMPRESS_QUALITY = 0.82 // JPEG quality, 0-1
+const COMPRESS_SKIP_BELOW_BYTES = 500 * 1024 // don't bother compressing already-small files
 
 interface GrPhotoRow {
   id: string
@@ -54,9 +67,50 @@ function extensionFor(fileName: string): string {
   return match ? match[1].toLowerCase() : 'jpg'
 }
 
-// Mock-only in-memory store. Object URLs (URL.createObjectURL) only make
-// sense here — real mode uses signed Storage URLs instead, so the cleanup
-// call (URL.revokeObjectURL) stays mock-only too.
+// Resizes and re-encodes an image file in-browser before upload. Skips
+// small files outright, and falls back to the original file on any error
+// (unsupported format, decode failure, etc.) rather than blocking the
+// upload — a slightly larger photo is better than a failed one.
+async function compressImage(file: File): Promise<File> {
+  if (file.size < COMPRESS_SKIP_BELOW_BYTES) return file
+
+  try {
+    const bitmap = await createImageBitmap(file)
+
+    const scale = Math.min(1, COMPRESS_MAX_DIMENSION / Math.max(bitmap.width, bitmap.height))
+    const width = Math.round(bitmap.width * scale)
+    const height = Math.round(bitmap.height * scale)
+
+    const canvas = document.createElement('canvas')
+    canvas.width = width
+    canvas.height = height
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return file
+
+    ctx.drawImage(bitmap, 0, 0, width, height)
+    bitmap.close?.()
+
+    const blob: Blob | null = await new Promise((resolve) =>
+      canvas.toBlob(resolve, 'image/jpeg', COMPRESS_QUALITY),
+    )
+    if (!blob) return file
+
+    // Only use the compressed version if it's actually smaller — a tiny or
+    // already-efficient source image could theoretically come back larger
+    // after re-encoding.
+    if (blob.size >= file.size) return file
+
+    // Re-encoded as JPEG regardless of source format, so the extension
+    // needs to match the actual content now, not the original filename.
+    const baseName = file.name.replace(/\.[^./]+$/, '')
+    return new File([blob], `${baseName}.jpg`, { type: 'image/jpeg', lastModified: Date.now() })
+  } catch (err) {
+    console.warn('Photo compression failed, uploading original file instead:', err)
+    return file
+  }
+}
+
+// Mock-only in-memory store.
 const mockStore: LocationPhoto[] = [...MOCK_PHOTOS]
 let mockCounter = 1
 
@@ -81,13 +135,15 @@ export async function addPhoto(
   file: File,
   uploadedBy: string,
 ): Promise<LocationPhoto> {
+  const compressedFile = await compressImage(file)
+
   if (!isSupabaseConfigured) {
     const photo: LocationPhoto = {
       id: `PH-${(mockCounter++).toString().padStart(4, '0')}`,
       locationId,
       category,
-      previewUrl: URL.createObjectURL(file),
-      fileName: file.name,
+      previewUrl: URL.createObjectURL(compressedFile),
+      fileName: compressedFile.name,
       uploadedBy,
       uploadedAt: new Date().toISOString(),
     }
@@ -104,10 +160,10 @@ export async function addPhoto(
   }
 
   const uuid = crypto.randomUUID()
-  const storagePath = `${location.projectCode}/${locationId}/${uuid}.${extensionFor(file.name)}`
+  const storagePath = `${location.projectCode}/${locationId}/${uuid}.${extensionFor(compressedFile.name)}`
 
-  const { error: uploadError } = await supabase!.storage.from(BUCKET).upload(storagePath, file, {
-    contentType: file.type || undefined,
+  const { error: uploadError } = await supabase!.storage.from(BUCKET).upload(storagePath, compressedFile, {
+    contentType: compressedFile.type || undefined,
   })
   if (uploadError) throw uploadError
 
@@ -117,7 +173,7 @@ export async function addPhoto(
       location_id: locationId,
       category,
       storage_path: storagePath,
-      file_name: file.name,
+      file_name: compressedFile.name,
       uploaded_by: uploadedBy,
     })
     .select('*')
