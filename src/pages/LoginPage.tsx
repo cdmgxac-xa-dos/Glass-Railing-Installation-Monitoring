@@ -82,8 +82,7 @@ export default function LoginPage() {
       </form>
 
       <p className="mt-8 text-center text-xs text-slate-400">
-        Mock login — any email / password combination works. Include "installer", "foreman", "qc", or
-        "owner" in the email to preview that role.
+        Sign in with your XA DOS account.
       </p>
     </div>
   )
