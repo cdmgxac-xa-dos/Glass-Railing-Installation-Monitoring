@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Check, X, Paperclip } from 'lucide-react'
+import { Check, X, Paperclip, Loader2 } from 'lucide-react'
 import type { Priority, QCResult } from '../types'
 import { PRIORITIES, QC_CHECKLIST_ITEMS } from '../types'
 import { submitQCInspection } from '../services/qcService'
+import { addPhoto } from '../services/photoService'
 import { useAuth } from '../context/AuthContext'
 import PageHeader from '../components/PageHeader'
 
@@ -11,6 +12,7 @@ export default function QCInspectionPage() {
   const { locationId = '' } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [itemResults, setItemResults] = useState<Record<string, boolean>>(
     Object.fromEntries(QC_CHECKLIST_ITEMS.map((i) => [i.key, true])),
@@ -19,12 +21,32 @@ export default function QCInspectionPage() {
   const [issueDescription, setIssueDescription] = useState('')
   const [priority, setPriority] = useState<Priority>('Medium')
   const [photoAttached, setPhotoAttached] = useState(false)
+  const [photoUploading, setPhotoUploading] = useState(false)
+  const [photoError, setPhotoError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState('')
 
   function toggleItem(key: string) {
     setItemResults((prev) => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  async function handlePhotoSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = '' // allow re-selecting the same file later if upload fails
+    if (!file) return
+
+    setPhotoError('')
+    setPhotoUploading(true)
+    try {
+      await addPhoto(locationId, 'Punch List', file, user?.name ?? 'QC Inspector')
+      setPhotoAttached(true)
+    } catch {
+      setPhotoAttached(false)
+      setPhotoError('Photo upload failed. Try again.')
+    } finally {
+      setPhotoUploading(false)
+    }
   }
 
   async function handleSubmit() {
@@ -162,14 +184,33 @@ export default function QCInspectionPage() {
                 ))}
               </div>
             </div>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handlePhotoSelected}
+              className="hidden"
+            />
             <button
-              onClick={() => setPhotoAttached((v) => !v)}
-              className={`flex w-full items-center justify-center gap-2 rounded-xl border py-2.5 text-xs font-bold ${
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={photoUploading}
+              className={`flex w-full items-center justify-center gap-2 rounded-xl border py-2.5 text-xs font-bold disabled:opacity-60 ${
                 photoAttached ? 'border-red-500 bg-red-100 text-red-700' : 'border-red-200 bg-white text-red-600'
               }`}
             >
-              <Paperclip size={14} /> {photoAttached ? 'Photo attached' : 'Attach photo'}
+              {photoUploading ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" /> Uploading…
+                </>
+              ) : (
+                <>
+                  <Paperclip size={14} /> {photoAttached ? 'Photo attached' : 'Attach photo'}
+                </>
+              )}
             </button>
+            {photoError && <p className="text-xs font-medium text-red-600">{photoError}</p>}
           </div>
         )}
 
