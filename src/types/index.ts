@@ -292,6 +292,7 @@ export interface ReportConfig {
   includeByUnitType: boolean
   includeByBracketSystem: boolean
   includeByTeam: boolean
+  includeByPunchList: boolean
   includeFullDetail: boolean
   includeFullDetailPhotos: boolean
   includeFullDetailQcPunchHistory: boolean

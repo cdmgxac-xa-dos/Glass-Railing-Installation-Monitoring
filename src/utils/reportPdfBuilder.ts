@@ -1,11 +1,18 @@
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import type { ReportConfig } from '../types'
+import type { QCInspectionRecord, ReportConfig } from '../types'
+import { QC_CHECKLIST_ITEMS } from '../types'
 import { getLocationsByProject, getProjectDashboard } from '../services/locationService'
 import { getQCRecordsForProject } from '../services/qcService'
 import { getPunchListForProject } from '../services/punchListService'
 import { getPhotosForLocation } from '../services/photoService'
 import { STATUS_ORDER } from '../constants/statusColors'
+
+// Thumbnail sizing shared by both photo-column tables (Full Location Detail
+// and Punch List Detail) — kept small on purpose per the "save paper space"
+// request that replaced the old one-page-per-location photo appendix.
+const THUMB_ROW_HEIGHT = 34 // pt, floor only — autoTable grows rows taller if wrapped text needs more room
+const THUMB_PAD = 2
 
 export async function buildReportPdf(
   projectCode: string,
@@ -100,6 +107,95 @@ export async function buildReportPdf(
   if (config.includeByBracketSystem) cursorY = groupedBreakdownTable(doc, cursorY, 'Breakdown by Bracket System', locations, (l) => l.bracketSystem)
   if (config.includeByTeam) cursorY = groupedBreakdownTable(doc, cursorY, 'Breakdown by Assigned Team', locations, (l) => l.assignedTeam)
 
+  // Shared fetches: QC + punch-list data feeds both the per-location history
+  // (inside Full Detail) and the standalone Punch List Detail table, so
+  // fetch once rather than twice when both are checked.
+  const needsQcPunchData = config.includeFullDetailQcPunchHistory || config.includeByPunchList
+  const qcRecords = needsQcPunchData ? await getQCRecordsForProject(projectCode) : []
+  const punchItems = needsQcPunchData ? await getPunchListForProject(projectCode) : []
+
+  // Shared last-photo-per-location cache: both the Full Detail photo column
+  // and the Punch List Detail photo column show only the single most recent
+  // photo per location (not a gallery) — this is what keeps the report
+  // compact instead of burning a page per location like the old appendix did.
+  const needsPhotos = config.includeFullDetailPhotos || config.includeByPunchList
+  const photoDataUrlByLocation = new Map<string, string | null>()
+  if (needsPhotos) {
+    await Promise.all(
+      locations.map(async (l) => {
+        photoDataUrlByLocation.set(l.id, await getLastPhotoDataUrl(l.id))
+      }),
+    )
+  }
+
+  if (config.includeByPunchList) {
+    doc.addPage()
+    cursorY = 40
+    doc.setFontSize(13)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Punch List Detail', 40, cursorY)
+    cursorY += 16
+
+    if (punchItems.length === 0) {
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'normal')
+      doc.text('No punch list items recorded for this project.', 40, cursorY)
+      cursorY += 20
+    } else {
+      // Most recent Failed QC inspection per location — punch items don't
+      // carry a direct FK to the inspection that created them, so this is
+      // the closest available match for "which checklist items failed".
+      const latestFailedQcByLocation = new Map<string, QCInspectionRecord>()
+      qcRecords
+        .filter((r) => r.result === 'Failed')
+        .sort((a, b) => new Date(a.inspectedAt).getTime() - new Date(b.inspectedAt).getTime())
+        .forEach((r) => latestFailedQcByLocation.set(r.locationId, r))
+
+      const photoColIndex = 6 // Floor, Tag ID, Unit, Status, Failed QC Item(s), Description, [Photo], Priority
+
+      autoTable(doc, {
+        startY: cursorY,
+        head: [['Floor', 'Tag ID', 'Unit', 'Punch Status', 'Failed QC Item(s)', 'Issue Description', 'Photo', 'Priority']],
+        body: punchItems.map((item) => {
+          const loc = locations.find((l) => l.id === item.locationId)
+          const failedQc = latestFailedQcByLocation.get(item.locationId)
+          const failedItemLabels = failedQc
+            ? QC_CHECKLIST_ITEMS.filter((d) => failedQc.itemResults[d.key] === false)
+                .map((d) => d.label)
+                .join(', ')
+            : ''
+          return [
+            loc?.floorLevel ?? '',
+            item.locationId,
+            loc?.unitNo ?? '',
+            item.status,
+            failedItemLabels || '—',
+            item.issueDescription,
+            '',
+            item.priority,
+          ]
+        }),
+        theme: 'grid',
+        headStyles: { fillColor: [10, 20, 40] },
+        styles: { fontSize: 6.5, minCellHeight: THUMB_ROW_HEIGHT },
+        columnStyles: { [photoColIndex]: { cellWidth: 40 } },
+        margin: { left: 40, right: 40 },
+        didDrawCell: (data) => {
+          if (data.section !== 'body' || data.column.index !== photoColIndex) return
+          // Same rationale as Full Location Detail's photo column: read the
+          // Tag ID off the rendered row (column 1) rather than indexing
+          // back into `punchItems` by data.row.index.
+          const tagId = (data.row.raw as unknown[] | undefined)?.[1]
+          if (typeof tagId !== 'string') return
+          const dataUrl = photoDataUrlByLocation.get(tagId)
+          if (!dataUrl) return
+          drawThumbnail(doc, dataUrl, data.cell.x, data.cell.y, data.cell.width, data.cell.height)
+        },
+      })
+      cursorY = (doc as any).lastAutoTable.finalY + 24
+    }
+  }
+
   if (config.includeFullDetail) {
     doc.addPage()
     cursorY = 40
@@ -108,17 +204,36 @@ export async function buildReportPdf(
     doc.text('Full Location Detail', 40, cursorY)
     cursorY += 16
 
-    const qcRecords = config.includeFullDetailQcPunchHistory ? await getQCRecordsForProject(projectCode) : []
-    const punchItems = config.includeFullDetailQcPunchHistory ? await getPunchListForProject(projectCode) : []
+    const detailHead = ['Tag ID', 'Floor', 'Unit', 'Status', 'Team', 'LM', 'Panels']
+    if (config.includeFullDetailPhotos) detailHead.push('Photo')
+    const photoColIndex = detailHead.length - 1
 
     autoTable(doc, {
       startY: cursorY,
-      head: [['Tag ID', 'Floor', 'Unit', 'Status', 'Team', 'LM', 'Panels']],
-      body: locations.map((l) => [l.id, l.floorLevel, l.unitNo, l.status, l.assignedTeam, `${l.totalLinearMeters}`, `${l.totalGlassPanels}`]),
+      head: [detailHead],
+      body: locations.map((l) => {
+        const row = [l.id, l.floorLevel, l.unitNo, l.status, l.assignedTeam, `${l.totalLinearMeters}`, `${l.totalGlassPanels}`]
+        if (config.includeFullDetailPhotos) row.push('') // drawn via didDrawCell below
+        return row
+      }),
       theme: 'grid',
       headStyles: { fillColor: [10, 20, 40] },
-      styles: { fontSize: 7 },
+      styles: { fontSize: 7, minCellHeight: config.includeFullDetailPhotos ? THUMB_ROW_HEIGHT : undefined },
+      columnStyles: config.includeFullDetailPhotos ? { [photoColIndex]: { cellWidth: 40 } } : undefined,
       margin: { left: 40, right: 40 },
+      didDrawCell: (data) => {
+        if (!config.includeFullDetailPhotos) return
+        if (data.section !== 'body' || data.column.index !== photoColIndex) return
+        // Read the Tag ID straight off the row autoTable actually rendered
+        // (column 0) rather than trusting data.row.index to line up with
+        // the source `locations` array — safer against autoTable's own
+        // pagination/reflow indexing.
+        const tagId = (data.row.raw as unknown[] | undefined)?.[0]
+        if (typeof tagId !== 'string') return
+        const dataUrl = photoDataUrlByLocation.get(tagId)
+        if (!dataUrl) return
+        drawThumbnail(doc, dataUrl, data.cell.x, data.cell.y, data.cell.width, data.cell.height)
+      },
     })
     cursorY = (doc as any).lastAutoTable.finalY + 20
 
@@ -157,36 +272,34 @@ export async function buildReportPdf(
         }
       }
     }
-
-    if (config.includeFullDetailPhotos) {
-      for (const loc of locations) {
-        const photos = await getPhotosForLocation(loc.id)
-        if (photos.length === 0) continue
-
-        doc.addPage()
-        cursorY = 40
-        doc.setFontSize(11)
-        doc.setFont('helvetica', 'bold')
-        doc.text(`${loc.id} — Photos (${photos.length})`, 40, cursorY)
-        cursorY += 20
-
-        let x = 40
-        for (const photo of photos) {
-          try {
-            const dataUrl = await urlToDataUrl(photo.previewUrl)
-            doc.addImage(dataUrl, 'JPEG', x, cursorY, 120, 90)
-          } catch {
-            // skip photos that fail to load rather than aborting the whole report
-          }
-          x += 130
-          if (x > pageWidth - 160) { x = 40; cursorY += 100 }
-          if (cursorY > 700) { doc.addPage(); cursorY = 40; x = 40 }
-        }
-      }
-    }
   }
 
   return { blob: doc.output('blob'), title }
+}
+
+// Draws a photo data URL into an autoTable cell rect, centered and clamped
+// to fit — used by both the Full Detail and Punch List Detail photo columns.
+function drawThumbnail(doc: jsPDF, dataUrl: string, cellX: number, cellY: number, cellWidth: number, cellHeight: number): void {
+  const h = cellHeight - THUMB_PAD * 2
+  const w = Math.min(h * 1.33, cellWidth - THUMB_PAD * 2)
+  try {
+    doc.addImage(dataUrl, 'JPEG', cellX + THUMB_PAD, cellY + THUMB_PAD, w, h)
+  } catch {
+    // skip malformed/undecodable images rather than aborting the whole report
+  }
+}
+
+// Last (most recently uploaded) photo for a location, converted to a data
+// URL for embedding — only one per location, not a full gallery, per the
+// "save paper space" request this replaced the old photo-appendix pages with.
+async function getLastPhotoDataUrl(locationId: string): Promise<string | null> {
+  const photos = await getPhotosForLocation(locationId)
+  if (photos.length === 0) return null
+  try {
+    return await urlToDataUrl(photos[photos.length - 1].previewUrl)
+  } catch {
+    return null
+  }
 }
 
 function ensureSpace(doc: jsPDF, cursorY: number): number {
