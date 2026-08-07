@@ -5,6 +5,7 @@ dist
 *.log
 .DS_Store
 *.tsbuildinfo
+supabase/.temp
 
 # Local Netlify folder
 .netlify

@@ -1,21 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import type { OwnerDashboardSummary } from '../types'
+import type { LocationStatus, OwnerDashboardSummary } from '../types'
 import { getOwnerDashboard } from '../services/locationService'
 import { useAppData } from '../context/DataContext'
 import PageHeader from '../components/PageHeader'
 import MetricCard from '../components/MetricCard'
 import { CheckCircle2, Clock, ClipboardList, ListTodo, PauseCircle, Circle } from 'lucide-react'
-
-const STATUS_COLORS: Record<string, string> = {
-  'Not Started': '#8A99A8',
-  'In Progress': '#1D6FE0',
-  'QC Inspection': '#B8860B',
-  'Punch List': '#D0453B',
-  'On Hold': '#6B5B95',
-  Completed: '#1E8E5A',
-}
+import { STATUS_COLORS } from '../constants/statusColors'
 
 function MiniBarChart({ data }: { data: { label: string; count: number }[] }) {
   return (
@@ -31,7 +23,7 @@ function MiniBarChart({ data }: { data: { label: string; count: number }[] }) {
           />
           <Bar dataKey="count" radius={[6, 6, 0, 0]}>
             {data.map((d) => (
-              <Cell key={d.label} fill={STATUS_COLORS[d.label] ?? '#1D6FE0'} />
+              <Cell key={d.label} fill={STATUS_COLORS[d.label as LocationStatus] ?? '#1D6FE0'} />
             ))}
           </Bar>
         </BarChart>

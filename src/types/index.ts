@@ -253,6 +253,12 @@ export interface StatusCounts {
   Completed: number
 }
 
+export interface FloorStatusBreakdown {
+  floorLevel: string
+  statusCounts: StatusCounts
+  locationCount: number
+}
+
 export interface ProjectDashboardSummary {
   projectName: string
   overallProgressPct: number
@@ -261,6 +267,7 @@ export interface ProjectDashboardSummary {
   linearMetersInstalledToday: number
   panelsInstalledToday: number
   qcPending: number
+  byFloorStatus: FloorStatusBreakdown[]
 }
 
 export interface OwnerDashboardSummary {

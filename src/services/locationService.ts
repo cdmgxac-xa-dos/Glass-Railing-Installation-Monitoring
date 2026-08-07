@@ -6,6 +6,7 @@ import type {
   OwnerDashboardSummary,
   ProjectDashboardSummary,
   RailingLocation,
+  StatusCounts,
   UnitType,
   UnitTypeSummary,
 } from '../types'
@@ -241,6 +242,19 @@ export async function getProjectDashboard(projectCode: string): Promise<ProjectD
   // built.
   const workedToday = locations.filter((l) => l.status === 'In Progress').slice(0, 4)
 
+  // Per-floor status breakdown, feeds the dashboard's floor doughnuts.
+  const floorMap = new Map<string, StatusCounts>()
+  locations.forEach((l) => {
+    const counts = floorMap.get(l.floorLevel) ?? emptyStatusCounts()
+    counts[l.status] += 1
+    floorMap.set(l.floorLevel, counts)
+  })
+  const byFloorStatus = naturalFloorSort(Array.from(floorMap.keys())).map((floorLevel) => {
+    const counts = floorMap.get(floorLevel)!
+    const locationCount = Object.values(counts).reduce((a, b) => a + b, 0)
+    return { floorLevel, statusCounts: counts, locationCount }
+  })
+
   return {
     projectName: locations[0]?.projectName ?? projectNameFor(projectCode),
     overallProgressPct,
@@ -250,6 +264,7 @@ export async function getProjectDashboard(projectCode: string): Promise<ProjectD
       Math.round(workedToday.reduce((sum, l) => sum + l.totalLinearMeters * 0.3, 0) * 10) / 10,
     panelsInstalledToday: Math.round(workedToday.reduce((sum, l) => sum + l.totalGlassPanels * 0.3, 0)),
     qcPending: statusCounts['QC Inspection'],
+    byFloorStatus,
   }
 }
 

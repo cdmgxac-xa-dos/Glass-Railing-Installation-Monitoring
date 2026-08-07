@@ -6,6 +6,7 @@ import { getProjectDashboard } from '../services/locationService'
 import { useAppData } from '../context/DataContext'
 import MetricCard from '../components/MetricCard'
 import PageHeader from '../components/PageHeader'
+import FloorStatusDoughnut from '../components/FloorStatusDoughnut'
 
 export default function ProjectDashboardPage() {
   const navigate = useNavigate()
@@ -72,6 +73,20 @@ export default function ProjectDashboardPage() {
             <MetricCard label="In Progress" value={summary.statusCounts['In Progress']} icon={Clock} accent="blue" />
             <MetricCard label="On Hold" value={summary.statusCounts['On Hold']} icon={PauseCircle} accent="violet" />
             <MetricCard label="Not Started" value={summary.statusCounts['Not Started']} icon={Circle} accent="slate" />
+          </div>
+        </div>
+
+        <div>
+          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-xa-slate">Accomplishment by floor</p>
+          <div className="space-y-3">
+            {summary.byFloorStatus.map((floor) => (
+              <FloorStatusDoughnut
+                key={floor.floorLevel}
+                floorLevel={floor.floorLevel}
+                statusCounts={floor.statusCounts}
+                locationCount={floor.locationCount}
+              />
+            ))}
           </div>
         </div>
 
