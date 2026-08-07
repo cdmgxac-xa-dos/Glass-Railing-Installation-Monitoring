@@ -8,17 +8,17 @@ import { getPunchListForProject } from '../services/punchListService'
 import { getPhotosForLocation } from '../services/photoService'
 import { STATUS_ORDER } from '../constants/statusColors'
 
-// Graphite gray — replaces the previous near-black navy for the header
-// banner and every table header row. No brand hex was supplied for this;
-// picked from the standard graphite range and easy to retune here in one
-// place if an exact brand hex shows up later.
-const GRAPHITE_HEX = '#3B3F42'
-const GRAPHITE_RGB: [number, number, number] = [0x3b, 0x3f, 0x42]
+// Graphite gray — brand hex for the header banner and every table header row.
+const GRAPHITE_HEX = '#5F6369'
+const GRAPHITE_RGB: [number, number, number] = [0x5f, 0x63, 0x69]
 
-// pt. Grows if/when the GXAC + Spinnaker logos are added (see
-// drawHeaderBanner) — 70 is only enough for the current single "XA" mark.
-const HEADER_HEIGHT = 70
+const HEADER_HEIGHT = 70 // pt
+const HEADER_LOGO_PAD_Y = 12 // pt, vertical padding above/below each right-side logo
+const HEADER_LOGO_GAP = 10 // pt, gap between the two right-side logos
 const CONTENT_START_Y = 90 // first content Y on every page, below the banner
+
+const GXAC_LOGO_URL = '/logo-gxac.png'
+const SPINNAKER_LOGO_URL = '/logo-spinnaker.png'
 
 // Thumbnail sizing shared by every photo column (Full Location Detail's
 // Before/During/After columns and Punch List Detail's Photo column) — kept
@@ -27,10 +27,55 @@ const CONTENT_START_Y = 90 // first content Y on every page, below the banner
 const THUMB_ROW_HEIGHT = 34 // pt, floor only — autoTable grows rows taller if wrapped text needs more room
 const THUMB_PAD = 2
 
+interface LogoAsset {
+  dataUrl: string
+  aspectRatio: number // natural width / natural height
+  alias: string // passed to doc.addImage() so repeated draws across pages reuse one embedded XObject instead of re-embedding the full image data every time
+}
+
 interface HeaderContext {
   pageWidth: number
   summary: ProjectDashboardSummary
   generatedDate: Date
+  gxacLogo: LogoAsset | null
+  spinnakerLogo: LogoAsset | null
+}
+
+// Source logo files (GXAC_logo.png, Spinnaker_Logo.png) are 1536x1024 —
+// far larger than a ~46pt header logo needs. Downscaling here keeps the
+// generated PDF's file size sane; 400px is still well above what's needed
+// for a crisp header logo even at high print DPI.
+const LOGO_MAX_DIMENSION = 400 // px
+
+// Fetches a public/ image once, downscales it, converts it to a data URL
+// for doc.addImage(), and reads its aspect ratio so the header can scale it
+// to a fixed height without distorting it. Returns null on any failure
+// (missing file, decode error) rather than throwing — a report with a
+// missing logo is still useful, a report that fails to generate isn't.
+async function loadLogoAsset(url: string, alias: string): Promise<LogoAsset | null> {
+  try {
+    const res = await fetch(url)
+    const blob = await res.blob()
+    const bitmap = await createImageBitmap(blob)
+    const aspectRatio = bitmap.width / bitmap.height
+
+    const scale = Math.min(1, LOGO_MAX_DIMENSION / Math.max(bitmap.width, bitmap.height))
+    const width = Math.round(bitmap.width * scale)
+    const height = Math.round(bitmap.height * scale)
+    const canvas = document.createElement('canvas')
+    canvas.width = width
+    canvas.height = height
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
+    ctx.drawImage(bitmap, 0, 0, width, height)
+    bitmap.close?.()
+
+    // PNG (not JPEG) to preserve the logo's transparent background.
+    const dataUrl = canvas.toDataURL('image/png')
+    return { dataUrl, aspectRatio, alias }
+  } catch {
+    return null
+  }
 }
 
 export async function buildReportPdf(
@@ -42,8 +87,19 @@ export async function buildReportPdf(
   const generatedDate = new Date()
   const title = `${summary.projectName.replace(/\s+/g, '_')}_Report_${generatedDate.toISOString().slice(0, 10)}`
 
+  const [gxacLogo, spinnakerLogo] = await Promise.all([
+    loadLogoAsset(GXAC_LOGO_URL, 'gxac-logo'),
+    loadLogoAsset(SPINNAKER_LOGO_URL, 'spinnaker-logo'),
+  ])
+
   const doc = new jsPDF({ unit: 'pt', format: 'a4' })
-  const header: HeaderContext = { pageWidth: doc.internal.pageSize.getWidth(), summary, generatedDate }
+  const header: HeaderContext = {
+    pageWidth: doc.internal.pageSize.getWidth(),
+    summary,
+    generatedDate,
+    gxacLogo,
+    spinnakerLogo,
+  }
 
   // Passed to every autoTable() call below so the banner repeats on every
   // page a table spans — including pages autoTable creates internally via
@@ -353,7 +409,10 @@ async function getPhotoDataUrlsForLocation(locationId: string): Promise<Location
 // date) at the top of the current page. Called once for the first page and
 // again via didDrawPage on every autoTable() call so it repeats on every
 // page a table spans, including pages autoTable paginates internally.
-function drawHeaderBanner(doc: jsPDF, { pageWidth, summary, generatedDate }: HeaderContext): void {
+function drawHeaderBanner(
+  doc: jsPDF,
+  { pageWidth, summary, generatedDate, gxacLogo, spinnakerLogo }: HeaderContext,
+): void {
   doc.setFillColor(...GRAPHITE_RGB)
   doc.rect(0, 0, pageWidth, HEADER_HEIGHT, 'F')
   doc.setTextColor(255, 255, 255)
@@ -369,15 +428,23 @@ function drawHeaderBanner(doc: jsPDF, { pageWidth, summary, generatedDate }: Hea
   doc.setFontSize(9)
   doc.text(`${summary.projectName} — Generated ${generatedDate.toLocaleString()}`, 40, 63)
 
-  // Reserved for the GXAC and Spinnaker logos on the right side of this
-  // banner, alongside the "XA" mark above — not wired up yet, no logo image
-  // files exist in this project. Once PNGs are supplied (transparent
-  // background, similar aspect ratio to the "XA" mark), add them here with
-  // doc.addImage(), right-aligned against pageWidth - 40, e.g.:
-  //   doc.addImage(gxacLogoDataUrl, 'PNG', pageWidth - 160, 12, 46, 46)
-  //   doc.addImage(spinnakerLogoDataUrl, 'PNG', pageWidth - 100, 12, 46, 46)
-  // HEADER_HEIGHT likely needs to grow (e.g. to ~90) once both logos are in
-  // place so a 3-logo row plus the title/subtitle text isn't cramped.
+  // GXAC and Spinnaker logos, right side of the banner, side by side.
+  // Each is scaled to the same height (HEADER_HEIGHT minus vertical
+  // padding) with its own aspect ratio preserved — not a fixed box — so
+  // neither logo looks stretched regardless of its native proportions.
+  // Laid out right-to-left from the page's right margin: Spinnaker
+  // outermost (closest to the edge), GXAC just inside it.
+  const logoHeight = HEADER_HEIGHT - HEADER_LOGO_PAD_Y * 2
+  let logoRightEdge = pageWidth - 40
+  if (spinnakerLogo) {
+    const w = logoHeight * spinnakerLogo.aspectRatio
+    doc.addImage(spinnakerLogo.dataUrl, 'PNG', logoRightEdge - w, HEADER_LOGO_PAD_Y, w, logoHeight, spinnakerLogo.alias)
+    logoRightEdge -= w + HEADER_LOGO_GAP
+  }
+  if (gxacLogo) {
+    const w = logoHeight * gxacLogo.aspectRatio
+    doc.addImage(gxacLogo.dataUrl, 'PNG', logoRightEdge - w, HEADER_LOGO_PAD_Y, w, logoHeight, gxacLogo.alias)
+  }
 
   doc.setTextColor(20, 20, 20)
 }
