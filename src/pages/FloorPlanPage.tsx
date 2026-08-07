@@ -36,6 +36,19 @@ function pinLabel(unitNo: string): string {
   return unitNo.length <= PIN_LABEL_MAX ? unitNo : `${unitNo.slice(0, PIN_LABEL_MAX - 1)}…`
 }
 
+// Landscape-and-wide counts as desktop-style even without a fine pointer —
+// this is what lets a touch-only tablet (iPad) held in landscape skip the
+// rotate prompt entirely, per the tablet revision to this spec.
+const DESKTOP_LANDSCAPE_MIN_WIDTH = 768
+
+function computeIsDesktopStyle(): boolean {
+  if (typeof window === 'undefined') return false
+  const hasFinePointer = window.matchMedia('(pointer: fine)').matches
+  const isPortraitNow = window.matchMedia('(orientation: portrait)').matches
+  const isLandscapeWide = !isPortraitNow && window.innerWidth >= DESKTOP_LANDSCAPE_MIN_WIDTH
+  return hasFinePointer || isLandscapeWide
+}
+
 export default function FloorPlanPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
@@ -54,10 +67,19 @@ export default function FloorPlanPage() {
   const [isPortrait, setIsPortrait] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(orientation: portrait)').matches,
   )
+  // Desktop-style = precise pointer available (mouse/trackpad, any screen
+  // size — covers a tablet with a connected mouse) OR landscape on a screen
+  // >=768px (covers a touch-only tablet in landscape, e.g. an iPad, without
+  // ever showing the rotate prompt it doesn't need). Only phones — narrow
+  // AND portrait, or narrow with no fine pointer — fall through to the
+  // original forced-landscape mobile flow.
+  const [isDesktopStyle, setIsDesktopStyle] = useState(computeIsDesktopStyle)
 
   const [picker, setPicker] = useState<{ xPct: number; yPct: number } | null>(null)
   const [pickerQuery, setPickerQuery] = useState('')
   const [confirmDeletePinId, setConfirmDeletePinId] = useState<string | null>(null)
+  const [draggingPinId, setDraggingPinId] = useState<string | null>(null)
+  const [isDraggingFileOver, setIsDraggingFileOver] = useState(false)
 
   const imageRef = useRef<HTMLImageElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -69,18 +91,30 @@ export default function FloorPlanPage() {
     }
   }, [selectedProjectCode, selectedFloor, navigate])
 
-  // --- Forced landscape ------------------------------------------------
+  // --- Forced landscape (phones only) + desktop-style detection --------
   // screen.orientation.lock() requires fullscreen on the browsers that
   // support it at all (mainly Android Chrome) and isn't supported on iOS
   // Safari, so it's attempted as a best-effort progressive enhancement —
   // the CSS-rotation wrapper below is what actually guarantees a landscape
-  // view everywhere, and doesn't depend on any of this succeeding.
+  // view everywhere, and doesn't depend on any of this succeeding. Skipped
+  // entirely when the device is already desktop-style (fine pointer, or a
+  // wide landscape tablet) — requesting fullscreen on a device that never
+  // needed the rotate prompt would just be disruptive.
   useEffect(() => {
-    const mq = window.matchMedia('(orientation: portrait)')
-    const onChange = () => setIsPortrait(mq.matches)
-    mq.addEventListener('change', onChange)
+    const orientationMq = window.matchMedia('(orientation: portrait)')
+    const pointerMq = window.matchMedia('(pointer: fine)')
+    const onOrientationChange = () => {
+      setIsPortrait(orientationMq.matches)
+      setIsDesktopStyle(computeIsDesktopStyle())
+    }
+    const onPointerChange = () => setIsDesktopStyle(computeIsDesktopStyle())
+    const onResize = () => setIsDesktopStyle(computeIsDesktopStyle())
+    orientationMq.addEventListener('change', onOrientationChange)
+    pointerMq.addEventListener('change', onPointerChange)
+    window.addEventListener('resize', onResize)
 
     async function tryLock() {
+      if (computeIsDesktopStyle()) return
       try {
         const el = document.documentElement
         if (el.requestFullscreen) await el.requestFullscreen()
@@ -94,7 +128,9 @@ export default function FloorPlanPage() {
     tryLock()
 
     return () => {
-      mq.removeEventListener('change', onChange)
+      orientationMq.removeEventListener('change', onOrientationChange)
+      pointerMq.removeEventListener('change', onPointerChange)
+      window.removeEventListener('resize', onResize)
       try {
         const orientation = screen.orientation as (ScreenOrientation & { unlock?: () => void }) | undefined
         orientation?.unlock?.()
@@ -131,10 +167,11 @@ export default function FloorPlanPage() {
       .finally(() => setLoading(false))
   }, [selectedProjectCode, selectedFloor])
 
-  async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    e.target.value = ''
-    if (!file || !selectedProjectCode || !selectedFloor) return
+  // Shared by the click-to-browse file input and desktop drag-and-drop —
+  // both end up with a File and go through the identical upload path
+  // (compression happens inside uploadFloorPlan() either way).
+  async function handleFileUpload(file: File) {
+    if (!selectedProjectCode || !selectedFloor) return
     setError('')
     setUploading(true)
     try {
@@ -151,6 +188,33 @@ export default function FloorPlanPage() {
     } finally {
       setUploading(false)
     }
+  }
+
+  function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (file) handleFileUpload(file)
+  }
+
+  // Desktop-only affordance (Section 3) — dragging an image file onto the
+  // upload area or the floor plan itself (while in edit mode, as a
+  // re-upload). Harmless to leave wired on touch devices too since a real
+  // OS-level file drag isn't a touch gesture; the visual highlight is what's
+  // gated to isDesktopStyle, not the handler itself.
+  function handleFileDrop(e: React.DragEvent) {
+    e.preventDefault()
+    setIsDraggingFileOver(false)
+    const file = e.dataTransfer.files?.[0]
+    if (file && file.type.startsWith('image/')) handleFileUpload(file)
+  }
+
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault()
+    if (!isDraggingFileOver) setIsDraggingFileOver(true)
+  }
+
+  function handleDragLeave() {
+    setIsDraggingFileOver(false)
   }
 
   function pctFromEvent(clientX: number, clientY: number): { xPct: number; yPct: number } | null {
@@ -186,6 +250,7 @@ export default function FloorPlanPage() {
     if (!editMode) return
     e.stopPropagation()
     dragPinIdRef.current = pinId
+    setDraggingPinId(pinId) // triggers the grabbing-cursor re-render; the ref alone drives the move/up logic
     ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
   }
 
@@ -200,6 +265,7 @@ export default function FloorPlanPage() {
   async function handlePinPointerUp(e: React.PointerEvent) {
     const pinId = dragPinIdRef.current
     dragPinIdRef.current = null
+    setDraggingPinId(null)
     if (!pinId) return
     ;(e.target as HTMLElement).releasePointerCapture(e.pointerId)
     const pin = pins.find((p) => p.id === pinId)
@@ -295,13 +361,22 @@ export default function FloorPlanPage() {
         {loading ? (
           <div className="flex h-full items-center justify-center text-sm text-xa-slate">Loading…</div>
         ) : !floorPlan ? (
-          <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
+          <div
+            className={`flex h-full flex-col items-center justify-center gap-3 p-6 text-center ${
+              isDesktopStyle && isDraggingFileOver ? 'bg-xa-skyblue/40' : ''
+            }`}
+            onDragOver={isDesktopStyle && canManagePins ? handleDragOver : undefined}
+            onDragLeave={isDesktopStyle && canManagePins ? handleDragLeave : undefined}
+            onDrop={isDesktopStyle && canManagePins ? handleFileDrop : undefined}
+          >
             {canManagePins ? (
               <>
                 <Upload size={28} className="text-xa-blue" />
                 <p className="text-sm font-semibold text-xa-navy">No floor plan uploaded yet</p>
                 <p className="max-w-xs text-xs text-xa-slate">
-                  Upload an image of this floor's layout so pins can be placed on it.
+                  {isDesktopStyle
+                    ? "Drag and drop an image of this floor's layout here, or:"
+                    : "Upload an image of this floor's layout so pins can be placed on it."}
                 </p>
                 <button
                   onClick={() => fileInputRef.current?.click()}
@@ -317,19 +392,33 @@ export default function FloorPlanPage() {
             <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileSelected} className="hidden" />
           </div>
         ) : (
-          <div className="relative inline-block min-h-full min-w-full">
+          <div
+            className={isDesktopStyle ? 'relative mx-auto max-w-5xl p-4' : 'relative inline-block min-h-full min-w-full'}
+            onDragOver={isDesktopStyle && editMode && canManagePins ? handleDragOver : undefined}
+            onDragLeave={isDesktopStyle && editMode && canManagePins ? handleDragLeave : undefined}
+            onDrop={isDesktopStyle && editMode && canManagePins ? handleFileDrop : undefined}
+          >
             <img
               ref={imageRef}
               src={floorPlan.imageUrl}
               alt={`${selectedFloor} floor plan`}
               onClick={handleImageClick}
-              className="block max-w-none"
-              style={{ touchAction: editMode ? 'none' : 'auto' }}
+              className={isDesktopStyle ? 'block h-auto w-full rounded-xl' : 'block max-w-none'}
+              style={{
+                touchAction: editMode ? 'none' : 'auto',
+                cursor: isDesktopStyle && editMode && canManagePins ? 'crosshair' : undefined,
+              }}
               draggable={false}
             />
+            {isDesktopStyle && editMode && canManagePins && isDraggingFileOver && (
+              <div className="pointer-events-none absolute inset-4 flex items-center justify-center rounded-xl border-2 border-dashed border-xa-blue bg-xa-skyblue/50 text-sm font-bold text-xa-navy">
+                Drop to replace this floor plan
+              </div>
+            )}
             {pins.map((pin) => {
               const loc = locationById.get(pin.locationId)
               const color = loc ? STATUS_COLORS[loc.status] : '#8A99A8'
+              const canDrag = editMode && canManagePins
               return (
                 <button
                   key={pin.id}
@@ -340,12 +429,15 @@ export default function FloorPlanPage() {
                     e.stopPropagation()
                     handlePinTap(pin)
                   }}
-                  className="absolute flex min-h-[32px] min-w-[32px] -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-full border-2 border-white text-[9px] font-bold text-white shadow-md"
+                  className={`absolute flex min-h-[32px] min-w-[32px] -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-full border-2 border-white text-[9px] font-bold text-white shadow-md transition-transform ${
+                    isDesktopStyle ? 'hover:scale-110' : ''
+                  }`}
                   style={{
                     left: `${pin.xPct * 100}%`,
                     top: `${pin.yPct * 100}%`,
                     backgroundColor: color,
                     touchAction: 'none',
+                    cursor: isDesktopStyle && canDrag ? (draggingPinId === pin.id ? 'grabbing' : 'grab') : undefined,
                   }}
                 >
                   {loc ? pinLabel(loc.unitNo) : '?'}
@@ -426,9 +518,13 @@ export default function FloorPlanPage() {
   // everywhere, including iOS Safari where screen.orientation.lock() isn't
   // supported at all) — it rotates the content 90° and swaps width/height
   // so it fills the viewport in landscape shape regardless of the device's
-  // actual physical orientation. When the device is already landscape (a
-  // tablet, or a successful orientation lock), no rotation is applied.
-  if (isPortrait) {
+  // actual physical orientation. Only applies to the phone case: not
+  // desktop-style, and actually portrait right now. A phone already
+  // rotated to landscape (narrow width, no fine pointer) falls through to
+  // the plain branch below without rotating again; so does any
+  // desktop-style device (fine pointer, or a wide landscape tablet) —
+  // those never see the rotate prompt at all.
+  if (!isDesktopStyle && isPortrait) {
     return (
       <div className="fixed inset-0 z-50 bg-[#F5F8FC]">
         <div
