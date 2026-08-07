@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import type { QCInspectionRecord, ReportConfig } from '../types'
+import type { LocationPhoto, ProjectDashboardSummary, QCInspectionRecord, ReportConfig } from '../types'
 import { QC_CHECKLIST_ITEMS } from '../types'
 import { getLocationsByProject, getProjectDashboard } from '../services/locationService'
 import { getQCRecordsForProject } from '../services/qcService'
@@ -8,11 +8,30 @@ import { getPunchListForProject } from '../services/punchListService'
 import { getPhotosForLocation } from '../services/photoService'
 import { STATUS_ORDER } from '../constants/statusColors'
 
-// Thumbnail sizing shared by both photo-column tables (Full Location Detail
-// and Punch List Detail) — kept small on purpose per the "save paper space"
-// request that replaced the old one-page-per-location photo appendix.
+// Graphite gray — replaces the previous near-black navy for the header
+// banner and every table header row. No brand hex was supplied for this;
+// picked from the standard graphite range and easy to retune here in one
+// place if an exact brand hex shows up later.
+const GRAPHITE_HEX = '#3B3F42'
+const GRAPHITE_RGB: [number, number, number] = [0x3b, 0x3f, 0x42]
+
+// pt. Grows if/when the GXAC + Spinnaker logos are added (see
+// drawHeaderBanner) — 70 is only enough for the current single "XA" mark.
+const HEADER_HEIGHT = 70
+const CONTENT_START_Y = 90 // first content Y on every page, below the banner
+
+// Thumbnail sizing shared by every photo column (Full Location Detail's
+// Before/During/After columns and Punch List Detail's Photo column) — kept
+// small on purpose per the "save paper space" request that replaced the old
+// one-page-per-location photo appendix.
 const THUMB_ROW_HEIGHT = 34 // pt, floor only — autoTable grows rows taller if wrapped text needs more room
 const THUMB_PAD = 2
+
+interface HeaderContext {
+  pageWidth: number
+  summary: ProjectDashboardSummary
+  generatedDate: Date
+}
 
 export async function buildReportPdf(
   projectCode: string,
@@ -24,24 +43,16 @@ export async function buildReportPdf(
   const title = `${summary.projectName.replace(/\s+/g, '_')}_Report_${generatedDate.toISOString().slice(0, 10)}`
 
   const doc = new jsPDF({ unit: 'pt', format: 'a4' })
-  const pageWidth = doc.internal.pageSize.getWidth()
-  let cursorY = 90
+  const header: HeaderContext = { pageWidth: doc.internal.pageSize.getWidth(), summary, generatedDate }
 
-  doc.setFillColor(10, 20, 40)
-  doc.rect(0, 0, pageWidth, 70, 'F')
-  doc.setTextColor(255, 255, 255)
-  doc.setFontSize(18)
-  doc.setFont('helvetica', 'bold')
-  doc.text('XA', 40, 30)
-  doc.setTextColor(91, 158, 245)
-  doc.text('A', 40 + doc.getTextWidth('X'), 30)
-  doc.setTextColor(255, 255, 255)
-  doc.setFontSize(13)
-  doc.setFont('helvetica', 'normal')
-  doc.text('Glass Railing Installation Report', 40, 50)
-  doc.setFontSize(9)
-  doc.text(`${summary.projectName} — Generated ${generatedDate.toLocaleString()}`, 40, 63)
-  doc.setTextColor(20, 20, 20)
+  // Passed to every autoTable() call below so the banner repeats on every
+  // page a table spans — including pages autoTable creates internally via
+  // its own pagination, which our own newPage()/ensureSpace() helpers can't
+  // reach since those only fire for page breaks we trigger ourselves.
+  const didDrawPage = () => drawHeaderBanner(doc, header)
+
+  drawHeaderBanner(doc, header)
+  let cursorY = CONTENT_START_Y
 
   if (config.includeGeneralSummary) {
     doc.setFontSize(13)
@@ -57,14 +68,15 @@ export async function buildReportPdf(
         ...STATUS_ORDER.map((s) => [s, `${summary.statusCounts[s]}`]),
       ],
       theme: 'grid',
-      headStyles: { fillColor: [10, 20, 40] },
+      headStyles: { fillColor: GRAPHITE_RGB },
       margin: { left: 40, right: 40 },
+      didDrawPage,
     })
     cursorY = (doc as any).lastAutoTable.finalY + 24
   }
 
   if (config.includeByFloor) {
-    cursorY = ensureSpace(doc, cursorY)
+    cursorY = ensureSpace(doc, cursorY, header)
     doc.setFontSize(13)
     doc.setFont('helvetica', 'bold')
     doc.text('Accomplishment by Floor', 40, cursorY)
@@ -76,15 +88,16 @@ export async function buildReportPdf(
         f.floorLevel, `${f.locationCount}`, ...STATUS_ORDER.map((s) => `${f.statusCounts[s]}`),
       ]),
       theme: 'grid',
-      headStyles: { fillColor: [10, 20, 40] },
+      headStyles: { fillColor: GRAPHITE_RGB },
       styles: { fontSize: 8 },
       margin: { left: 40, right: 40 },
+      didDrawPage,
     })
     cursorY = (doc as any).lastAutoTable.finalY + 24
   }
 
   if (config.includeByStatus) {
-    cursorY = ensureSpace(doc, cursorY)
+    cursorY = ensureSpace(doc, cursorY, header)
     doc.setFontSize(13)
     doc.setFont('helvetica', 'bold')
     doc.text('Breakdown by Status', 40, cursorY)
@@ -97,15 +110,16 @@ export async function buildReportPdf(
         locations.length ? `${Math.round((summary.statusCounts[s] / locations.length) * 100)}%` : '0%',
       ]),
       theme: 'grid',
-      headStyles: { fillColor: [10, 20, 40] },
+      headStyles: { fillColor: GRAPHITE_RGB },
       margin: { left: 40, right: 40 },
+      didDrawPage,
     })
     cursorY = (doc as any).lastAutoTable.finalY + 24
   }
 
-  if (config.includeByUnitType) cursorY = groupedBreakdownTable(doc, cursorY, 'Breakdown by Unit Type', locations, (l) => l.unitType)
-  if (config.includeByBracketSystem) cursorY = groupedBreakdownTable(doc, cursorY, 'Breakdown by Bracket System', locations, (l) => l.bracketSystem)
-  if (config.includeByTeam) cursorY = groupedBreakdownTable(doc, cursorY, 'Breakdown by Assigned Team', locations, (l) => l.assignedTeam)
+  if (config.includeByUnitType) cursorY = groupedBreakdownTable(doc, cursorY, header, didDrawPage, 'Breakdown by Unit Type', locations, (l) => l.unitType)
+  if (config.includeByBracketSystem) cursorY = groupedBreakdownTable(doc, cursorY, header, didDrawPage, 'Breakdown by Bracket System', locations, (l) => l.bracketSystem)
+  if (config.includeByTeam) cursorY = groupedBreakdownTable(doc, cursorY, header, didDrawPage, 'Breakdown by Assigned Team', locations, (l) => l.assignedTeam)
 
   // Shared fetches: QC + punch-list data feeds both the per-location history
   // (inside Full Detail) and the standalone Punch List Detail table, so
@@ -114,23 +128,24 @@ export async function buildReportPdf(
   const qcRecords = needsQcPunchData ? await getQCRecordsForProject(projectCode) : []
   const punchItems = needsQcPunchData ? await getPunchListForProject(projectCode) : []
 
-  // Shared last-photo-per-location cache: both the Full Detail photo column
-  // and the Punch List Detail photo column show only the single most recent
-  // photo per location (not a gallery) — this is what keeps the report
-  // compact instead of burning a page per location like the old appendix did.
+  // Shared per-location photo cache. Punch List Detail's Photo column shows
+  // the single most recent photo overall (`last`); Full Location Detail's
+  // Before/During/After columns each show the most recent photo tagged
+  // with that stage. Fetching each location's photos once and deriving all
+  // four from that one array avoids redundant network round-trips when
+  // both sections are checked.
   const needsPhotos = config.includeFullDetailPhotos || config.includeByPunchList
-  const photoDataUrlByLocation = new Map<string, string | null>()
+  const photosByLocation = new Map<string, LocationPhotoDataUrls>()
   if (needsPhotos) {
     await Promise.all(
       locations.map(async (l) => {
-        photoDataUrlByLocation.set(l.id, await getLastPhotoDataUrl(l.id))
+        photosByLocation.set(l.id, await getPhotoDataUrlsForLocation(l.id))
       }),
     )
   }
 
   if (config.includeByPunchList) {
-    doc.addPage()
-    cursorY = 40
+    cursorY = newPage(doc, header)
     doc.setFontSize(13)
     doc.setFont('helvetica', 'bold')
     doc.text('Punch List Detail', 40, cursorY)
@@ -176,18 +191,19 @@ export async function buildReportPdf(
           ]
         }),
         theme: 'grid',
-        headStyles: { fillColor: [10, 20, 40] },
+        headStyles: { fillColor: GRAPHITE_RGB },
         styles: { fontSize: 6.5, minCellHeight: THUMB_ROW_HEIGHT },
         columnStyles: { [photoColIndex]: { cellWidth: 40 } },
         margin: { left: 40, right: 40 },
+        didDrawPage,
         didDrawCell: (data) => {
           if (data.section !== 'body' || data.column.index !== photoColIndex) return
-          // Same rationale as Full Location Detail's photo column: read the
-          // Tag ID off the rendered row (column 1) rather than indexing
-          // back into `punchItems` by data.row.index.
+          // Same rationale as Full Location Detail's photo columns: read
+          // the Tag ID off the rendered row (column 1) rather than
+          // indexing back into `punchItems` by data.row.index.
           const tagId = (data.row.raw as unknown[] | undefined)?.[1]
           if (typeof tagId !== 'string') return
-          const dataUrl = photoDataUrlByLocation.get(tagId)
+          const dataUrl = photosByLocation.get(tagId)?.last
           if (!dataUrl) return
           drawThumbnail(doc, dataUrl, data.cell.x, data.cell.y, data.cell.width, data.cell.height)
         },
@@ -197,40 +213,49 @@ export async function buildReportPdf(
   }
 
   if (config.includeFullDetail) {
-    doc.addPage()
-    cursorY = 40
+    cursorY = newPage(doc, header)
     doc.setFontSize(13)
     doc.setFont('helvetica', 'bold')
     doc.text('Full Location Detail', 40, cursorY)
     cursorY += 16
 
-    const detailHead = ['Tag ID', 'Floor', 'Unit', 'Status', 'Team', 'LM', 'Panels']
-    if (config.includeFullDetailPhotos) detailHead.push('Photo')
-    const photoColIndex = detailHead.length - 1
+    const detailHead = ['Tag ID', 'Floor', 'Unit', 'Status']
+    if (config.includeFullDetailPhotos) detailHead.push('Before', 'During', 'After')
+    const beforeColIndex = config.includeFullDetailPhotos ? detailHead.length - 3 : -1
+    const duringColIndex = config.includeFullDetailPhotos ? detailHead.length - 2 : -1
+    const afterColIndex = config.includeFullDetailPhotos ? detailHead.length - 1 : -1
 
     autoTable(doc, {
       startY: cursorY,
       head: [detailHead],
       body: locations.map((l) => {
-        const row = [l.id, l.floorLevel, l.unitNo, l.status, l.assignedTeam, `${l.totalLinearMeters}`, `${l.totalGlassPanels}`]
-        if (config.includeFullDetailPhotos) row.push('') // drawn via didDrawCell below
+        const row = [l.id, l.floorLevel, l.unitNo, l.status]
+        if (config.includeFullDetailPhotos) row.push('', '', '') // drawn via didDrawCell below
         return row
       }),
       theme: 'grid',
-      headStyles: { fillColor: [10, 20, 40] },
+      headStyles: { fillColor: GRAPHITE_RGB },
       styles: { fontSize: 7, minCellHeight: config.includeFullDetailPhotos ? THUMB_ROW_HEIGHT : undefined },
-      columnStyles: config.includeFullDetailPhotos ? { [photoColIndex]: { cellWidth: 40 } } : undefined,
+      columnStyles: config.includeFullDetailPhotos
+        ? { [beforeColIndex]: { cellWidth: 40 }, [duringColIndex]: { cellWidth: 40 }, [afterColIndex]: { cellWidth: 40 } }
+        : undefined,
       margin: { left: 40, right: 40 },
+      didDrawPage,
       didDrawCell: (data) => {
-        if (!config.includeFullDetailPhotos) return
-        if (data.section !== 'body' || data.column.index !== photoColIndex) return
+        if (!config.includeFullDetailPhotos || data.section !== 'body') return
+        const stage: keyof LocationPhotoDataUrls | null =
+          data.column.index === beforeColIndex ? 'before'
+          : data.column.index === duringColIndex ? 'during'
+          : data.column.index === afterColIndex ? 'after'
+          : null
+        if (!stage) return
         // Read the Tag ID straight off the row autoTable actually rendered
         // (column 0) rather than trusting data.row.index to line up with
         // the source `locations` array — safer against autoTable's own
         // pagination/reflow indexing.
         const tagId = (data.row.raw as unknown[] | undefined)?.[0]
         if (typeof tagId !== 'string') return
-        const dataUrl = photoDataUrlByLocation.get(tagId)
+        const dataUrl = photosByLocation.get(tagId)?.[stage]
         if (!dataUrl) return
         drawThumbnail(doc, dataUrl, data.cell.x, data.cell.y, data.cell.width, data.cell.height)
       },
@@ -246,7 +271,7 @@ export async function buildReportPdf(
         const locPunch = punchByLocation[loc.id] ?? []
         if (locQc.length === 0 && locPunch.length === 0) continue
 
-        cursorY = ensureSpace(doc, cursorY)
+        cursorY = ensureSpace(doc, cursorY, header)
         doc.setFontSize(10)
         doc.setFont('helvetica', 'bold')
         doc.text(`${loc.id} — QC & Punch List History`, 40, cursorY)
@@ -258,6 +283,7 @@ export async function buildReportPdf(
             head: [['Inspected At', 'Result', 'Inspected By']],
             body: locQc.map((r) => [new Date(r.inspectedAt).toLocaleDateString(), r.result ?? '', r.inspectedBy]),
             theme: 'striped', styles: { fontSize: 7 }, margin: { left: 50, right: 40 },
+            didDrawPage,
           })
           cursorY = (doc as any).lastAutoTable.finalY + 8
         }
@@ -267,6 +293,7 @@ export async function buildReportPdf(
             head: [['Found', 'Priority', 'Status', 'Description']],
             body: locPunch.map((p) => [new Date(p.dateFound).toLocaleDateString(), p.priority, p.status, p.issueDescription]),
             theme: 'striped', styles: { fontSize: 7 }, margin: { left: 50, right: 40 },
+            didDrawPage,
           })
           cursorY = (doc as any).lastAutoTable.finalY + 16
         }
@@ -289,29 +316,98 @@ function drawThumbnail(doc: jsPDF, dataUrl: string, cellX: number, cellY: number
   }
 }
 
-// Last (most recently uploaded) photo for a location, converted to a data
-// URL for embedding — only one per location, not a full gallery, per the
-// "save paper space" request this replaced the old photo-appendix pages with.
-async function getLastPhotoDataUrl(locationId: string): Promise<string | null> {
-  const photos = await getPhotosForLocation(locationId)
-  if (photos.length === 0) return null
-  try {
-    return await urlToDataUrl(photos[photos.length - 1].previewUrl)
-  } catch {
-    return null
-  }
+interface LocationPhotoDataUrls {
+  last: string | null // most recent photo overall — Punch List Detail's Photo column
+  before: string | null // most recent 'Before' photo — Full Location Detail
+  during: string | null // most recent 'During' photo — Full Location Detail
+  after: string | null // most recent 'After' photo — Full Location Detail
 }
 
-function ensureSpace(doc: jsPDF, cursorY: number): number {
+// Fetches a location's photos once and derives all four values needed by
+// the report's photo columns from that single array, rather than issuing a
+// separate fetch per stage.
+async function getPhotoDataUrlsForLocation(locationId: string): Promise<LocationPhotoDataUrls> {
+  const photos = await getPhotosForLocation(locationId)
+  const lastOf = (category?: LocationPhoto['category']): LocationPhoto | null => {
+    const matches = category ? photos.filter((p) => p.category === category) : photos
+    return matches.length > 0 ? matches[matches.length - 1] : null
+  }
+  const toDataUrl = async (photo: LocationPhoto | null): Promise<string | null> => {
+    if (!photo) return null
+    try {
+      return await urlToDataUrl(photo.previewUrl)
+    } catch {
+      return null
+    }
+  }
+  const [last, before, during, after] = await Promise.all([
+    toDataUrl(lastOf()),
+    toDataUrl(lastOf('Before')),
+    toDataUrl(lastOf('During')),
+    toDataUrl(lastOf('After')),
+  ])
+  return { last, before, during, after }
+}
+
+// Draws the repeating title banner (logo, report title, project + generated
+// date) at the top of the current page. Called once for the first page and
+// again via didDrawPage on every autoTable() call so it repeats on every
+// page a table spans, including pages autoTable paginates internally.
+function drawHeaderBanner(doc: jsPDF, { pageWidth, summary, generatedDate }: HeaderContext): void {
+  doc.setFillColor(...GRAPHITE_RGB)
+  doc.rect(0, 0, pageWidth, HEADER_HEIGHT, 'F')
+  doc.setTextColor(255, 255, 255)
+  doc.setFontSize(18)
+  doc.setFont('helvetica', 'bold')
+  doc.text('XA', 40, 30)
+  doc.setTextColor(91, 158, 245)
+  doc.text('A', 40 + doc.getTextWidth('X'), 30)
+  doc.setTextColor(255, 255, 255)
+  doc.setFontSize(13)
+  doc.setFont('helvetica', 'normal')
+  doc.text('Glass Railing Installation Report', 40, 50)
+  doc.setFontSize(9)
+  doc.text(`${summary.projectName} — Generated ${generatedDate.toLocaleString()}`, 40, 63)
+
+  // Reserved for the GXAC and Spinnaker logos on the right side of this
+  // banner, alongside the "XA" mark above — not wired up yet, no logo image
+  // files exist in this project. Once PNGs are supplied (transparent
+  // background, similar aspect ratio to the "XA" mark), add them here with
+  // doc.addImage(), right-aligned against pageWidth - 40, e.g.:
+  //   doc.addImage(gxacLogoDataUrl, 'PNG', pageWidth - 160, 12, 46, 46)
+  //   doc.addImage(spinnakerLogoDataUrl, 'PNG', pageWidth - 100, 12, 46, 46)
+  // HEADER_HEIGHT likely needs to grow (e.g. to ~90) once both logos are in
+  // place so a 3-logo row plus the title/subtitle text isn't cramped.
+
+  doc.setTextColor(20, 20, 20)
+}
+
+// Starts a new page and immediately redraws the header banner on it, for
+// page breaks we trigger ourselves (section headers, ensureSpace overflow).
+function newPage(doc: jsPDF, header: HeaderContext): number {
+  doc.addPage()
+  drawHeaderBanner(doc, header)
+  return CONTENT_START_Y
+}
+
+function ensureSpace(doc: jsPDF, cursorY: number, header: HeaderContext): number {
   const pageHeight = doc.internal.pageSize.getHeight()
-  if (cursorY + 60 > pageHeight - 40) { doc.addPage(); return 40 }
+  if (cursorY + 60 > pageHeight - 40) return newPage(doc, header)
   return cursorY
 }
 
-function groupedBreakdownTable<T>(doc: jsPDF, cursorY: number, heading: string, locations: T[], keyFn: (l: T) => string): number {
+function groupedBreakdownTable<T>(
+  doc: jsPDF,
+  cursorY: number,
+  header: HeaderContext,
+  didDrawPage: () => void,
+  heading: string,
+  locations: T[],
+  keyFn: (l: T) => string,
+): number {
   const counts = new Map<string, number>()
   locations.forEach((l) => counts.set(keyFn(l), (counts.get(keyFn(l)) ?? 0) + 1))
-  cursorY = ensureSpace(doc, cursorY)
+  cursorY = ensureSpace(doc, cursorY, header)
   doc.setFontSize(13)
   doc.setFont('helvetica', 'bold')
   doc.text(heading, 40, cursorY)
@@ -320,7 +416,8 @@ function groupedBreakdownTable<T>(doc: jsPDF, cursorY: number, heading: string, 
     startY: cursorY,
     head: [['Category', 'Count']],
     body: Array.from(counts.entries()).map(([k, v]) => [k, `${v}`]),
-    theme: 'grid', headStyles: { fillColor: [10, 20, 40] }, margin: { left: 40, right: 40 },
+    theme: 'grid', headStyles: { fillColor: GRAPHITE_RGB }, margin: { left: 40, right: 40 },
+    didDrawPage,
   })
   return (doc as any).lastAutoTable.finalY + 24
 }

@@ -10,7 +10,7 @@ import PageHeader from '../components/PageHeader'
 const DEFAULT_CONFIG: ReportConfig = {
   includeGeneralSummary: true,
   includeByFloor: true,
-  includeByStatus: false,
+  includeByStatus: true,
   includeByUnitType: false,
   includeByBracketSystem: false,
   includeByTeam: false,
