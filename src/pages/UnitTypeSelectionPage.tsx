@@ -46,6 +46,12 @@ export default function UnitTypeSelectionPage() {
         >
           View all unit types on this floor
         </button>
+        <button
+          onClick={() => navigate('/floor-plan')}
+          className="w-full rounded-2xl border border-xa-line bg-white py-3 text-sm font-bold text-xa-blue shadow-card active:bg-xa-skyblue"
+        >
+          View Floor Plan
+        </button>
       </div>
     </div>
   )

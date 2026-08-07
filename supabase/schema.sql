@@ -378,3 +378,104 @@ create policy "glass_railing_reports_insert" on storage.objects
 drop policy if exists "glass_railing_reports_delete" on storage.objects;
 create policy "glass_railing_reports_delete" on storage.objects
   for delete using (bucket_id = 'glass-railing-reports' and gr_is_owner_or_pm());
+
+-- ---------------------------------------------------------------------------
+-- Floor Plan Pin feature: gr_floor_plans + gr_location_pins + the
+-- gr-floor-plans bucket. Pin management is deliberately gated by
+-- gr_can_manage_pins(), independent of gr_can_write()/field_ops edit level,
+-- so it stays adjustable without affecting field_ops permissions elsewhere.
+-- Real role_code for "PIC" is 'field_pic', not 'pic' — verified live via
+-- `select role_code from roles` before this was deployed.
+-- ---------------------------------------------------------------------------
+
+insert into storage.buckets (id, name, public)
+values ('gr-floor-plans', 'gr-floor-plans', false)
+on conflict (id) do nothing;
+
+create or replace function gr_can_manage_pins()
+returns boolean
+language sql stable security definer
+set search_path = public
+as $$
+  select gr_current_role_code() in ('field_pic', 'projects', 'qc_officer')
+$$;
+
+create table if not exists gr_floor_plans (
+  id uuid primary key default gen_random_uuid(),
+  project_code text not null,
+  floor_level text not null,
+  image_url text not null,        -- e.g. 'PRJ-26070002/10th Floor.jpg' in gr-floor-plans
+  image_width int,
+  image_height int,
+  uploaded_by text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (project_code, floor_level)
+);
+
+drop trigger if exists trg_gr_floor_plans_updated_at on gr_floor_plans;
+create trigger trg_gr_floor_plans_updated_at
+before update on gr_floor_plans
+for each row execute function set_updated_at();
+
+create table if not exists gr_location_pins (
+  id uuid primary key default gen_random_uuid(),
+  floor_plan_id uuid not null references gr_floor_plans(id) on delete cascade,
+  location_id text not null references gr_locations(id) on delete cascade,
+  x_pct numeric(6,5) not null check (x_pct >= 0 and x_pct <= 1),
+  y_pct numeric(6,5) not null check (y_pct >= 0 and y_pct <= 1),
+  created_by text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (floor_plan_id, location_id)
+);
+
+create index if not exists idx_gr_location_pins_floor_plan on gr_location_pins(floor_plan_id);
+create index if not exists idx_gr_location_pins_location on gr_location_pins(location_id);
+
+drop trigger if exists trg_gr_location_pins_updated_at on gr_location_pins;
+create trigger trg_gr_location_pins_updated_at
+before update on gr_location_pins
+for each row execute function set_updated_at();
+
+alter table gr_floor_plans enable row level security;
+alter table gr_location_pins enable row level security;
+
+drop policy if exists gr_floor_plans_select on gr_floor_plans;
+create policy gr_floor_plans_select on gr_floor_plans
+  for select using (gr_can_read());
+drop policy if exists gr_floor_plans_insert on gr_floor_plans;
+create policy gr_floor_plans_insert on gr_floor_plans
+  for insert with check (gr_can_manage_pins());
+drop policy if exists gr_floor_plans_update on gr_floor_plans;
+create policy gr_floor_plans_update on gr_floor_plans
+  for update using (gr_can_manage_pins()) with check (gr_can_manage_pins());
+drop policy if exists gr_floor_plans_delete on gr_floor_plans;
+create policy gr_floor_plans_delete on gr_floor_plans
+  for delete using (gr_can_manage_pins());
+
+drop policy if exists gr_location_pins_select on gr_location_pins;
+create policy gr_location_pins_select on gr_location_pins
+  for select using (gr_can_read());
+drop policy if exists gr_location_pins_insert on gr_location_pins;
+create policy gr_location_pins_insert on gr_location_pins
+  for insert with check (gr_can_manage_pins());
+drop policy if exists gr_location_pins_update on gr_location_pins;
+create policy gr_location_pins_update on gr_location_pins
+  for update using (gr_can_manage_pins()) with check (gr_can_manage_pins());
+drop policy if exists gr_location_pins_delete on gr_location_pins;
+create policy gr_location_pins_delete on gr_location_pins
+  for delete using (gr_can_manage_pins());
+
+drop policy if exists gr_floor_plans_storage_select on storage.objects;
+create policy gr_floor_plans_storage_select on storage.objects
+  for select using (bucket_id = 'gr-floor-plans' and gr_can_read());
+drop policy if exists gr_floor_plans_storage_insert on storage.objects;
+create policy gr_floor_plans_storage_insert on storage.objects
+  for insert with check (bucket_id = 'gr-floor-plans' and gr_can_manage_pins());
+drop policy if exists gr_floor_plans_storage_update on storage.objects;
+create policy gr_floor_plans_storage_update on storage.objects
+  for update using (bucket_id = 'gr-floor-plans' and gr_can_manage_pins());
+drop policy if exists gr_floor_plans_storage_delete on storage.objects;
+create policy gr_floor_plans_storage_delete on storage.objects
+  for delete using (bucket_id = 'gr-floor-plans' and gr_can_manage_pins());

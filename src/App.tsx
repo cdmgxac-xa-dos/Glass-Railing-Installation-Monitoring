@@ -21,6 +21,7 @@ import OwnerDashboardPage from './pages/OwnerDashboardPage'
 import KanbanBoardPage from './pages/KanbanBoardPage'
 import MorePage from './pages/MorePage'
 import ReportsPage from './pages/ReportsPage'
+import FloorPlanPage from './pages/FloorPlanPage'
 
 export default function App() {
   return (
@@ -51,6 +52,7 @@ export default function App() {
         <Route path="/dashboard" element={<ProjectDashboardPage />} />
         <Route path="/floors" element={<FloorSelectionPage />} />
         <Route path="/unit-types" element={<UnitTypeSelectionPage />} />
+        <Route path="/floor-plan" element={<FloorPlanPage />} />
         <Route path="/locations" element={<LocationCardsPage />} />
         <Route path="/locations/:locationId" element={<WorkCardPage />} />
         <Route path="/locations/:locationId/checklist" element={<InstallationChecklistPage />} />

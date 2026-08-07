@@ -1,12 +1,21 @@
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import type { LocationPhoto, ProjectDashboardSummary, QCInspectionRecord, ReportConfig } from '../types'
+import type {
+  FloorPlan,
+  LocationPhoto,
+  LocationPin,
+  ProjectDashboardSummary,
+  QCInspectionRecord,
+  RailingLocation,
+  ReportConfig,
+} from '../types'
 import { QC_CHECKLIST_ITEMS } from '../types'
 import { getLocationsByProject, getProjectDashboard } from '../services/locationService'
 import { getQCRecordsForProject } from '../services/qcService'
 import { getPunchListForProject } from '../services/punchListService'
 import { getPhotosForLocation } from '../services/photoService'
-import { STATUS_ORDER } from '../constants/statusColors'
+import { getFloorPlan, getPinsForFloorPlan } from '../services/floorPlanService'
+import { STATUS_COLORS, STATUS_ORDER } from '../constants/statusColors'
 
 // Graphite gray — brand hex for the header banner and every table header row.
 const GRAPHITE_HEX = '#5F6369'
@@ -29,6 +38,13 @@ const SPINNAKER_LOGO_URL = '/logo-spinnaker.png'
 // one-page-per-location photo appendix.
 const THUMB_ROW_HEIGHT = 34 // pt, floor only — autoTable grows rows taller if wrapped text needs more room
 const THUMB_PAD = 2
+
+// Floor plan images can be large content diagrams (not simple logos), so
+// this cap is higher than LOGO_MAX_DIMENSION below — still enough to keep
+// pin labels legible at "2-3 per portrait page" scale without repeating the
+// multi-MB bloat problem the unscaled logo embeds originally had.
+const FLOOR_PLAN_MAX_DIMENSION = 1400 // px
+const FLOOR_PLAN_PIN_RADIUS = 9 // px, at FLOOR_PLAN_MAX_DIMENSION scale
 
 interface LogoAsset {
   dataUrl: string
@@ -281,6 +297,50 @@ export async function buildReportPdf(
     }
   }
 
+  if (config.includeFloorPlans) {
+    // jsPDF can only embed static images, not live DOM — each floor's plan
+    // + pins is rasterized to an offscreen canvas first, then embedded as
+    // one PNG per floor. Statuses come from `locations`, fetched fresh at
+    // the top of this function for this report run, not any cached value.
+    const floorLevels = summary.byFloorStatus.map((f) => f.floorLevel)
+    const rendered: { floorLevel: string; dataUrl: string; aspectRatio: number }[] = []
+    for (const floorLevel of floorLevels) {
+      const plan = await getFloorPlan(projectCode, floorLevel)
+      if (!plan) continue // floors without an uploaded plan are silently skipped
+      const pins = await getPinsForFloorPlan(plan.id)
+      const canvasResult = await renderFloorPlanCanvas(plan, pins, locations)
+      if (canvasResult) rendered.push({ floorLevel, ...canvasResult })
+    }
+
+    if (rendered.length > 0) {
+      cursorY = newPage(doc, header)
+      doc.setFontSize(13)
+      doc.setFont('helvetica', 'bold')
+      doc.text('Floor Plans', 40, cursorY)
+      cursorY += 20
+
+      // Legend drawn once for the whole section, not repeated per floor/page.
+      cursorY = drawStatusLegend(doc, cursorY)
+
+      const usableWidth = header.pageWidth - 80
+      const pageHeight = doc.internal.pageSize.getHeight()
+      for (const { floorLevel, dataUrl, aspectRatio } of rendered) {
+        const imgHeight = usableWidth / aspectRatio
+        const neededHeight = 18 + imgHeight + 16
+        if (cursorY + neededHeight > pageHeight - 40) {
+          cursorY = newPage(doc, header)
+        }
+        doc.setFontSize(11)
+        doc.setFont('helvetica', 'bold')
+        doc.setTextColor(20, 20, 20)
+        doc.text(floorLevel, 40, cursorY)
+        cursorY += 14
+        doc.addImage(dataUrl, 'JPEG', 40, cursorY, usableWidth, imgHeight)
+        cursorY += imgHeight + 16
+      }
+    }
+  }
+
   if (config.includeFullDetail) {
     cursorY = newPage(doc, header)
     doc.setFontSize(13)
@@ -371,6 +431,100 @@ export async function buildReportPdf(
   }
 
   return { blob: doc.output('blob'), title }
+}
+
+function hexToRgb(hex: string): [number, number, number] {
+  const clean = hex.replace('#', '')
+  return [parseInt(clean.slice(0, 2), 16), parseInt(clean.slice(2, 4), 16), parseInt(clean.slice(4, 6), 16)]
+}
+
+// Fetches a floor plan image, downscales it, draws a colored dot + unit_no
+// label for each pin (using each pin's linked location's CURRENT status —
+// `locations` is fetched fresh at the top of buildReportPdf, not cached),
+// and returns the result as a data URL ready for doc.addImage(). Returns
+// null on any failure (missing/undecodable image) so one bad floor plan
+// doesn't abort the rest of the report.
+async function renderFloorPlanCanvas(
+  plan: FloorPlan,
+  pins: LocationPin[],
+  locations: RailingLocation[],
+): Promise<{ dataUrl: string; aspectRatio: number } | null> {
+  try {
+    const res = await fetch(plan.imageUrl)
+    const blob = await res.blob()
+    const bitmap = await createImageBitmap(blob)
+
+    const scale = Math.min(1, FLOOR_PLAN_MAX_DIMENSION / Math.max(bitmap.width, bitmap.height))
+    const width = Math.round(bitmap.width * scale)
+    const height = Math.round(bitmap.height * scale)
+
+    const canvas = document.createElement('canvas')
+    canvas.width = width
+    canvas.height = height
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
+    // White background first: this gets exported as JPEG (no alpha channel)
+    // below, so any transparent edges in the source image would otherwise
+    // flatten to black instead of white.
+    ctx.fillStyle = '#FFFFFF'
+    ctx.fillRect(0, 0, width, height)
+    ctx.drawImage(bitmap, 0, 0, width, height)
+    bitmap.close?.()
+
+    const locationById = new Map(locations.map((l) => [l.id, l]))
+    for (const pin of pins) {
+      const loc = locationById.get(pin.locationId)
+      const [r, g, b] = hexToRgb(loc ? STATUS_COLORS[loc.status] : '#8A99A8')
+      const cx = pin.xPct * width
+      const cy = pin.yPct * height
+
+      ctx.beginPath()
+      ctx.arc(cx, cy, FLOOR_PLAN_PIN_RADIUS, 0, Math.PI * 2)
+      ctx.fillStyle = `rgb(${r},${g},${b})`
+      ctx.fill()
+      ctx.lineWidth = 2
+      ctx.strokeStyle = '#FFFFFF'
+      ctx.stroke()
+
+      if (loc) {
+        ctx.font = 'bold 10px sans-serif'
+        ctx.fillStyle = '#FFFFFF'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        const label = loc.unitNo.length > 6 ? `${loc.unitNo.slice(0, 5)}…` : loc.unitNo
+        ctx.fillText(label, cx, cy)
+      }
+    }
+
+    // JPEG (not PNG): the rasterized floor plan doesn't need alpha
+    // transparency (unlike the logos), and jsPDF's PNG/alpha-channel embed
+    // path was storing this as raw, uncompressed pixel data — a 1400x933
+    // render came out well over 5MB per image. JPEG lets jsPDF pass through
+    // the already-DCT-compressed stream directly instead of re-encoding raw
+    // pixels, which is what the logos' PNG path also needed (alpha), but
+    // this render doesn't.
+    return { dataUrl: canvas.toDataURL('image/jpeg', 0.85), aspectRatio: width / height }
+  } catch {
+    return null
+  }
+}
+
+// Small color-swatch + status-name legend, drawn once per report (not once
+// per floor or per page) right below the "Floor Plans" section heading.
+function drawStatusLegend(doc: jsPDF, cursorY: number): number {
+  doc.setFontSize(8)
+  doc.setFont('helvetica', 'normal')
+  let x = 40
+  STATUS_ORDER.forEach((status) => {
+    const [r, g, b] = hexToRgb(STATUS_COLORS[status])
+    doc.setFillColor(r, g, b)
+    doc.circle(x + 3, cursorY - 3, 3, 'F')
+    doc.setTextColor(60, 60, 60)
+    doc.text(status, x + 10, cursorY)
+    x += doc.getTextWidth(status) + 26
+  })
+  doc.setTextColor(20, 20, 20)
+  return cursorY + 16
 }
 
 // Draws a photo data URL into an autoTable cell rect, centered and clamped

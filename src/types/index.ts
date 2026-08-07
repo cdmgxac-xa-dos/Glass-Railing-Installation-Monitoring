@@ -73,6 +73,13 @@ export interface AppUser {
   name: string
   role: UserRole
   email: string
+  // Real-mode only: the underlying DB role_code (e.g. 'field_pic',
+  // 'qc_officer', 'safety_officer') before collapsing into the 5-value
+  // UserRole above. Several distinct role_codes map to the same UserRole
+  // (e.g. 'QC Inspector' covers qc_officer/field_pic/safety_officer), so
+  // features that need to distinguish between them — like floor-plan pin
+  // management — read this instead of `role`. Undefined in mock mode.
+  roleCode?: string
 }
 
 export interface Project {
@@ -99,6 +106,31 @@ export interface RailingLocation {
   status: LocationStatus
   remarks: string
   updatedAt: string // ISO datetime
+}
+
+// ---- Floor plan pins --------------------------------------------------------
+
+export interface FloorPlan {
+  id: string
+  projectCode: string
+  floorLevel: string
+  imageUrl: string
+  imageWidth?: number
+  imageHeight?: number
+  uploadedBy?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface LocationPin {
+  id: string
+  floorPlanId: string
+  locationId: string
+  xPct: number // 0-1, relative to image width
+  yPct: number // 0-1, relative to image height
+  createdBy?: string
+  createdAt: string
+  updatedAt: string
 }
 
 // ---- Installation checklist -----------------------------------------------
@@ -293,6 +325,7 @@ export interface ReportConfig {
   includeByBracketSystem: boolean
   includeByTeam: boolean
   includeByPunchList: boolean
+  includeFloorPlans: boolean
   includeFullDetail: boolean
   includeFullDetailPhotos: boolean
   includeFullDetailQcPunchHistory: boolean

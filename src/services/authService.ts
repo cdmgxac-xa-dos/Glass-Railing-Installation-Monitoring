@@ -45,12 +45,17 @@ const ROLE_CODE_MAP: Record<string, UserRole> = {
   owner: 'Owner',
 }
 
+// roleCode mirrors the real role_code each mock user would map from (see
+// ROLE_CODE_MAP above) — needed so mock-mode UI testing of role_code-level
+// checks (e.g. floor-plan pin management) behaves the same as real mode.
+// 'Foreman' has no real role_code equivalent anymore (see note above), so
+// it's left undefined — correctly excluded from any roleCode-based check.
 const MOCK_USERS: Record<UserRole, AppUser> = {
-  Installer: { id: 'u-installer', name: 'Mark Dizon', role: 'Installer', email: 'mark.dizon@xados.local' },
+  Installer: { id: 'u-installer', name: 'Mark Dizon', role: 'Installer', email: 'mark.dizon@xados.local', roleCode: 'installer' },
   Foreman: { id: 'u-foreman', name: 'Ronnie Cruz', role: 'Foreman', email: 'ronnie.cruz@xados.local' },
-  'QC Inspector': { id: 'u-qc', name: 'Joy Ramos', role: 'QC Inspector', email: 'joy.ramos@xados.local' },
-  'Project Manager': { id: 'u-pm', name: 'Elaine Torres', role: 'Project Manager', email: 'elaine.torres@xados.local' },
-  Owner: { id: 'u-owner', name: 'Antonio Xavier', role: 'Owner', email: 'antonio.xavier@xados.local' },
+  'QC Inspector': { id: 'u-qc', name: 'Joy Ramos', role: 'QC Inspector', email: 'joy.ramos@xados.local', roleCode: 'qc_officer' },
+  'Project Manager': { id: 'u-pm', name: 'Elaine Torres', role: 'Project Manager', email: 'elaine.torres@xados.local', roleCode: 'projects' },
+  Owner: { id: 'u-owner', name: 'Antonio Xavier', role: 'Owner', email: 'antonio.xavier@xados.local', roleCode: 'owner' },
 }
 
 interface HydrationRow {
@@ -94,6 +99,7 @@ async function hydrateAppUser(authUserId: string): Promise<AppUser> {
     name: row.employee?.full_name ?? row.login_email,
     role: mappedRole,
     email: row.login_email,
+    roleCode,
   }
 }
 
