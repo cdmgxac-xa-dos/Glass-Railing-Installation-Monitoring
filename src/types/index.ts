@@ -285,6 +285,29 @@ export interface OwnerDashboardSummary {
   byStatus: { label: string; count: number }[]
 }
 
+export interface ReportConfig {
+  includeGeneralSummary: boolean
+  includeByFloor: boolean
+  includeByStatus: boolean
+  includeByUnitType: boolean
+  includeByBracketSystem: boolean
+  includeByTeam: boolean
+  includeFullDetail: boolean
+  includeFullDetailPhotos: boolean
+  includeFullDetailQcPunchHistory: boolean
+}
+
+export interface ReportHistoryEntry {
+  id: string
+  projectCode: string
+  reportTitle: string
+  config: ReportConfig
+  storagePath: string
+  generatedBy: string
+  generatedAt: string
+  isAutomatic: boolean
+}
+
 export interface FloorSummary {
   floorLevel: string
   locationCount: number

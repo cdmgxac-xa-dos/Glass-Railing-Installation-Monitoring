@@ -310,6 +310,38 @@ drop policy if exists "gr_activity_logs_insert" on gr_activity_logs;
 create policy "gr_activity_logs_insert" on gr_activity_logs
   for insert with check (gr_can_write());
 
+-- gr_report_history: Reports feature (Phase 1). Deliberately gated by
+-- gr_is_owner_or_pm() rather than gr_can_read()/gr_can_write() — reports
+-- are Owner/Project Manager-only, unlike every other gr_* table which the
+-- wider field_ops population can at least read.
+create or replace function public.gr_is_owner_or_pm()
+returns boolean
+language sql stable security definer
+set search_path to 'public'
+as $$
+  select gr_current_role_code() in ('owner', 'projects')
+$$;
+
+create table if not exists gr_report_history (
+  id uuid primary key default gen_random_uuid(),
+  project_code text not null,
+  report_title text not null,
+  config jsonb not null,
+  storage_path text not null,        -- e.g. 'PR-001/<uuid>.pdf' in the glass-railing-reports bucket
+  generated_by text not null,        -- no FK yet, same as gr_photos.uploaded_by (see note 5 above)
+  generated_at timestamptz not null default now(),
+  is_automatic boolean not null default false -- set by Phase 2's scheduled Edge Function job
+);
+
+alter table gr_report_history enable row level security;
+
+drop policy if exists "gr_report_history_select" on gr_report_history;
+create policy "gr_report_history_select" on gr_report_history
+  for select using (gr_is_owner_or_pm());
+drop policy if exists "gr_report_history_insert" on gr_report_history;
+create policy "gr_report_history_insert" on gr_report_history
+  for insert with check (gr_is_owner_or_pm());
+
 -- ---------------------------------------------------------------------------
 -- Storage bucket (run separately in the Supabase dashboard or via the
 -- Storage API — SQL alone can't create buckets on most Supabase versions).
@@ -320,3 +352,29 @@ create policy "gr_activity_logs_insert" on gr_activity_logs
 -- Keep it private; serve via signed URLs from the photoService, not public
 -- URLs, since field photos may be commercially sensitive.
 -- ---------------------------------------------------------------------------
+
+-- ---------------------------------------------------------------------------
+-- glass-railing-reports bucket + Storage RLS. Unlike glass-railing-photos
+-- above, this one IS created directly via SQL (insert into storage.buckets)
+-- rather than the dashboard — both approaches work on this Supabase
+-- version; this one was chosen so the whole Reports feature is scriptable
+-- in one pass.
+--
+-- Path convention: {project_code}/{uuid}.pdf
+-- Private; served via signed URLs from reportService, same as photos.
+-- Deliberately gated by gr_is_owner_or_pm(), NOT gr_can_read()/gr_can_write()
+-- — reports are Owner/Project Manager-only.
+-- ---------------------------------------------------------------------------
+insert into storage.buckets (id, name, public)
+values ('glass-railing-reports', 'glass-railing-reports', false)
+on conflict (id) do nothing;
+
+drop policy if exists "glass_railing_reports_select" on storage.objects;
+create policy "glass_railing_reports_select" on storage.objects
+  for select using (bucket_id = 'glass-railing-reports' and gr_is_owner_or_pm());
+drop policy if exists "glass_railing_reports_insert" on storage.objects;
+create policy "glass_railing_reports_insert" on storage.objects
+  for insert with check (bucket_id = 'glass-railing-reports' and gr_is_owner_or_pm());
+drop policy if exists "glass_railing_reports_delete" on storage.objects;
+create policy "glass_railing_reports_delete" on storage.objects
+  for delete using (bucket_id = 'glass-railing-reports' and gr_is_owner_or_pm());

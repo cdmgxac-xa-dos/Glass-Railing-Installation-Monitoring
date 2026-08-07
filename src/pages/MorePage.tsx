@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { Building2, ClipboardList, KanbanSquare, LayoutDashboard, LogOut, Info, ChevronRight } from 'lucide-react'
+import { Building2, ClipboardList, KanbanSquare, LayoutDashboard, LogOut, Info, ChevronRight, FileText } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useAppData } from '../context/DataContext'
 import PageHeader from '../components/PageHeader'
@@ -8,6 +8,7 @@ import PageHeader from '../components/PageHeader'
 const OWNER_DASHBOARD_ROLES = ['Project Manager', 'Owner']
 const KANBAN_ROLES = ['Project Manager', 'Owner', 'Foreman']
 const PUNCH_LIST_ROLES = ['Project Manager', 'Owner', 'Foreman', 'QC Inspector']
+const REPORTS_ROLES = ['Project Manager', 'Owner']
 
 export default function MorePage() {
   const navigate = useNavigate()
@@ -17,6 +18,7 @@ export default function MorePage() {
   const canSeeOwnerDashboard = user ? OWNER_DASHBOARD_ROLES.includes(user.role) : false
   const canSeeKanban = user ? KANBAN_ROLES.includes(user.role) : false
   const canSeePunchList = user ? PUNCH_LIST_ROLES.includes(user.role) : false
+  const canSeeReports = user ? REPORTS_ROLES.includes(user.role) : false
 
   return (
     <div className="min-h-screen bg-[#F5F8FC]">
@@ -43,7 +45,7 @@ export default function MorePage() {
           </button>
         </div>
 
-        {(canSeeOwnerDashboard || canSeeKanban || canSeePunchList) && (
+        {(canSeeOwnerDashboard || canSeeKanban || canSeePunchList || canSeeReports) && (
           <div className="space-y-2">
             {canSeeOwnerDashboard && (
               <button
@@ -74,6 +76,17 @@ export default function MorePage() {
               >
                 <span className="flex items-center gap-3 text-sm font-bold text-xa-navy">
                   <ClipboardList size={18} className="text-xa-blue" /> Punch List (all locations)
+                </span>
+                <ChevronRight size={18} className="text-slate-300" />
+              </button>
+            )}
+            {canSeeReports && (
+              <button
+                onClick={() => navigate('/reports')}
+                className="flex w-full items-center justify-between rounded-2xl border border-xa-line bg-white p-4 shadow-card"
+              >
+                <span className="flex items-center gap-3 text-sm font-bold text-xa-navy">
+                  <FileText size={18} className="text-xa-blue" /> Reports
                 </span>
                 <ChevronRight size={18} className="text-slate-300" />
               </button>

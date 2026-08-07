@@ -2,7 +2,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabaseClient'
 import type { Priority, QCInspectionRecord, QCResult } from '../types'
 import { MOCK_QC_RECORDS } from '../data/mockData'
 import { addPunchListItem } from './punchListService'
-import { updateLocationStatus } from './locationService'
+import { getLocationById, getLocationsByProject, updateLocationStatus } from './locationService'
 import { addTimelineEvent } from './timelineService'
 
 // ---------------------------------------------------------------------------
@@ -56,6 +56,35 @@ export async function getQCRecordsForLocation(locationId: string): Promise<QCIns
     .from('gr_qc_inspections')
     .select('*')
     .eq('location_id', locationId)
+    .order('inspected_at')
+
+  if (error) throw error
+  return (data as GrQcInspectionRow[]).map(mapRow)
+}
+
+// Project-scoped fetch for the Reports feature. Mirrors
+// punchListService.ts's getPunchListForProject() — one .in() query in real
+// mode rather than N sequential getLocationById() round-trips per record.
+export async function getQCRecordsForProject(projectCode: string): Promise<QCInspectionRecord[]> {
+  if (!isSupabaseConfigured) {
+    const results: QCInspectionRecord[] = []
+    for (const record of mockStore) {
+      const loc = await getLocationById(record.locationId)
+      if (loc?.projectCode === projectCode) results.push(record)
+    }
+    return results
+  }
+
+  const locations = await getLocationsByProject(projectCode)
+  if (locations.length === 0) return []
+
+  const { data, error } = await supabase!
+    .from('gr_qc_inspections')
+    .select('*')
+    .in(
+      'location_id',
+      locations.map((l) => l.id),
+    )
     .order('inspected_at')
 
   if (error) throw error

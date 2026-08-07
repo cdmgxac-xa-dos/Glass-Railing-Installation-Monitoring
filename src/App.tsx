@@ -20,6 +20,7 @@ import UpdateStatusPage from './pages/UpdateStatusPage'
 import OwnerDashboardPage from './pages/OwnerDashboardPage'
 import KanbanBoardPage from './pages/KanbanBoardPage'
 import MorePage from './pages/MorePage'
+import ReportsPage from './pages/ReportsPage'
 
 export default function App() {
   return (
@@ -76,6 +77,14 @@ export default function App() {
           element={
             <ProtectedRoute allowedRoles={['Project Manager', 'Owner', 'Foreman']}>
               <KanbanBoardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/reports"
+          element={
+            <ProtectedRoute allowedRoles={['Project Manager', 'Owner']}>
+              <ReportsPage />
             </ProtectedRoute>
           }
         />
