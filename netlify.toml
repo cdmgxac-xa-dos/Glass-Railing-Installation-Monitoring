@@ -6,3 +6,28 @@
   from = "/*"
   to = "/index.html"
   status = 200
+
+# index.html, the manifest, and the service worker must always be
+# re-fetched so installed/home-screen users pick up new deploys instead
+# of getting stuck on a cached shell.
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+# Hashed build assets are safe to cache forever — a new deploy always
+# produces new filenames.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
