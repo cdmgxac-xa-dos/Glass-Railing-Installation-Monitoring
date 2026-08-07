@@ -12,10 +12,13 @@ import { STATUS_ORDER } from '../constants/statusColors'
 const GRAPHITE_HEX = '#5F6369'
 const GRAPHITE_RGB: [number, number, number] = [0x5f, 0x63, 0x69]
 
-const HEADER_HEIGHT = 70 // pt
 const HEADER_LOGO_PAD_Y = 12 // pt, vertical padding above/below each right-side logo
 const HEADER_LOGO_GAP = 10 // pt, gap between the two right-side logos
-const CONTENT_START_Y = 90 // first content Y on every page, below the banner
+// 1.5x the original 46pt (46 = the old HEADER_HEIGHT(70) - pad(12)*2) —
+// HEADER_HEIGHT is derived from this so the banner always grows to fit.
+const HEADER_LOGO_HEIGHT = 69 // pt
+const HEADER_HEIGHT = HEADER_LOGO_HEIGHT + HEADER_LOGO_PAD_Y * 2 // pt
+const CONTENT_START_Y = HEADER_HEIGHT + 20 // first content Y on every page, below the banner
 
 const GXAC_LOGO_URL = '/logo-gxac.png'
 const SPINNAKER_LOGO_URL = '/logo-spinnaker.png'
@@ -69,6 +72,16 @@ async function loadLogoAsset(url: string, alias: string): Promise<LogoAsset | nu
     if (!ctx) return null
     ctx.drawImage(bitmap, 0, 0, width, height)
     bitmap.close?.()
+
+    // Recolor the logo artwork to solid white, preserving its alpha shape —
+    // the header banner is graphite, and the logos' original colors (GXAC's
+    // red, Spinnaker's tan line art) don't read cleanly against it. 'source-in'
+    // keeps only the alpha of what's already on the canvas (the logo's
+    // silhouette) and fills it with the new color, so edges/anti-aliasing
+    // stay intact — this is a pixel-level recolor, not a CSS filter.
+    ctx.globalCompositeOperation = 'source-in'
+    ctx.fillStyle = '#FFFFFF'
+    ctx.fillRect(0, 0, width, height)
 
     // PNG (not JPEG) to preserve the logo's transparent background.
     const dataUrl = canvas.toDataURL('image/png')
@@ -429,12 +442,12 @@ function drawHeaderBanner(
   doc.text(`${summary.projectName} — Generated ${generatedDate.toLocaleString()}`, 40, 63)
 
   // GXAC and Spinnaker logos, right side of the banner, side by side.
-  // Each is scaled to the same height (HEADER_HEIGHT minus vertical
-  // padding) with its own aspect ratio preserved — not a fixed box — so
-  // neither logo looks stretched regardless of its native proportions.
-  // Laid out right-to-left from the page's right margin: Spinnaker
-  // outermost (closest to the edge), GXAC just inside it.
-  const logoHeight = HEADER_HEIGHT - HEADER_LOGO_PAD_Y * 2
+  // Each is scaled to HEADER_LOGO_HEIGHT with its own aspect ratio
+  // preserved — not a fixed box — so neither logo looks stretched
+  // regardless of its native proportions. Laid out right-to-left from the
+  // page's right margin: Spinnaker outermost (closest to the edge), GXAC
+  // just inside it.
+  const logoHeight = HEADER_LOGO_HEIGHT
   let logoRightEdge = pageWidth - 40
   if (spinnakerLogo) {
     const w = logoHeight * spinnakerLogo.aspectRatio
