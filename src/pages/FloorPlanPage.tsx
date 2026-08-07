@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, RotateCw, Upload, X, Search, Trash2, Pencil, Eye } from 'lucide-react'
+import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
+import { ChevronLeft, RotateCw, Upload, X, Search, Trash2, Pencil, Eye, ZoomOut } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useAppData } from '../context/DataContext'
 import type { FloorPlan, LocationPin, RailingLocation } from '../types'
@@ -35,6 +36,15 @@ const PIN_LABEL_MAX = 6
 function pinLabel(unitNo: string): string {
   return unitNo.length <= PIN_LABEL_MAX ? unitNo : `${unitNo.slice(0, PIN_LABEL_MAX - 1)}…`
 }
+
+// react-zoom-pan-pinch's panning/pinch/doubleClick "excluded" options match
+// on this class name (verified against the installed package's actual
+// implementation, not just its type defs — it does a DOM .matches() check,
+// independent of React event propagation) so a touch/drag that starts on a
+// pin never also starts a pan or pinch gesture underneath it. Kept as its
+// own constant so the JSX class list and the TransformWrapper config can't
+// drift out of sync.
+const PIN_EXCLUDE_CLASS = 'floor-plan-pin'
 
 // Landscape-and-wide counts as desktop-style even without a fine pointer —
 // this is what lets a touch-only tablet (iPad) held in landscape skip the
@@ -80,16 +90,49 @@ export default function FloorPlanPage() {
   const [confirmDeletePinId, setConfirmDeletePinId] = useState<string | null>(null)
   const [draggingPinId, setDraggingPinId] = useState<string | null>(null)
   const [isDraggingFileOver, setIsDraggingFileOver] = useState(false)
+  // Measured pixel size of the available viewport area for the mobile
+  // pinch/pan viewer. CSS percentage max-height doesn't reliably resolve
+  // against an ancestor whose own height comes from shrink-wrapping its
+  // content (the classic "percentage height needs a determinate ancestor
+  // chain" gotcha) — measuring in JS and applying explicit pixel
+  // maxWidth/maxHeight to the image sidesteps that entirely, and keeps the
+  // image element's own bounding box tightly matching its visible content
+  // (no object-fit letterboxing to account for), so pin xPct/yPct math
+  // against imageRef stays correct at every zoom/pan level.
+  const [mobileViewportSize, setMobileViewportSize] = useState<{ width: number; height: number } | null>(null)
 
   const imageRef = useRef<HTMLImageElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const dragPinIdRef = useRef<string | null>(null)
+  // Latest dragged position, tracked in a ref rather than read back out of
+  // `pins` state on pointerup — avoids any dependence on React having
+  // flushed the in-progress drag's setPins before the save runs.
+  const dragLatestPosRef = useRef<{ xPct: number; yPct: number } | null>(null)
+  const mobileViewportRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!selectedProjectCode || !selectedFloor) {
       navigate('/unit-types')
     }
   }, [selectedProjectCode, selectedFloor, navigate])
+
+  // Measures the mobile viewer's available space so the image can be given
+  // an explicit pixel maxWidth/maxHeight (see mobileViewportSize above).
+  // useLayoutEffect, not useEffect, so the measurement is applied before
+  // the browser paints — avoids a flash of oversized/cut-off image on
+  // mount. ResizeObserver (not just the window resize listener elsewhere
+  // in this file) because the CSS-rotation wrapper changes this element's
+  // size without necessarily firing a window resize event.
+  useLayoutEffect(() => {
+    if (isDesktopStyle) return
+    const el = mobileViewportRef.current
+    if (!el) return
+    const measure = () => setMobileViewportSize({ width: el.clientWidth, height: el.clientHeight })
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [isDesktopStyle, isPortrait])
 
   // --- Forced landscape (phones only) + desktop-style detection --------
   // screen.orientation.lock() requires fullscreen on the browsers that
@@ -248,10 +291,22 @@ export default function FloorPlanPage() {
   // drag-to-reposition that works on both desktop and mobile.
   function handlePinPointerDown(e: React.PointerEvent, pinId: string) {
     if (!editMode) return
+    // Belt-and-braces with TransformWrapper's own `excluded` option (which
+    // matches on PIN_EXCLUDE_CLASS via DOM .matches(), independent of React
+    // propagation): together these guarantee a touch starting on a pin never
+    // also starts a pan/pinch underneath it.
     e.stopPropagation()
     dragPinIdRef.current = pinId
+    dragLatestPosRef.current = null
     setDraggingPinId(pinId) // triggers the grabbing-cursor re-render; the ref alone drives the move/up logic
-    ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+    // Best-effort only: keeps tracking the drag if the pointer slides off the
+    // pin. Throws NotFoundError when the pointer isn't active, so it must
+    // never be allowed to abort the drag.
+    try {
+      ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+    } catch {
+      // non-fatal — drag still works via the move/up handlers
+    }
   }
 
   function handlePinPointerMove(e: React.PointerEvent) {
@@ -259,26 +314,55 @@ export default function FloorPlanPage() {
     if (!pinId) return
     const pos = pctFromEvent(e.clientX, e.clientY)
     if (!pos) return
+    dragLatestPosRef.current = pos
     setPins((prev) => prev.map((p) => (p.id === pinId ? { ...p, ...pos } : p)))
   }
 
   async function handlePinPointerUp(e: React.PointerEvent) {
     const pinId = dragPinIdRef.current
+    const finalPos = dragLatestPosRef.current
     dragPinIdRef.current = null
+    dragLatestPosRef.current = null
     setDraggingPinId(null)
-    if (!pinId) return
-    ;(e.target as HTMLElement).releasePointerCapture(e.pointerId)
-    const pin = pins.find((p) => p.id === pinId)
-    if (!pin || !selectedProjectCode || !selectedFloor) return
+
+    // Read everything needed for the save BEFORE releasing capture, and treat
+    // the release as best-effort. releasePointerCapture throws NotFoundError
+    // whenever the pointer is no longer active — a pointercancel, an
+    // interrupted touch gesture, the browser reclaiming the gesture — all of
+    // which are common on mobile. Letting that throw run ahead of the save
+    // silently discarded the user's reposition.
     try {
-      await updatePinPosition(pin.id, pin.xPct, pin.yPct)
+      ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
+    } catch {
+      // non-fatal — nothing below depends on the capture being released
+    }
+
+    // No finalPos means a tap, not a drag — handlePinTap's onClick covers it.
+    if (!pinId || !finalPos || !selectedProjectCode || !selectedFloor) return
+    try {
+      await updatePinPosition(pinId, finalPos.xPct, finalPos.yPct)
       // Pins-only cache refresh — the floor plan image itself is untouched
-      // by a drag, so no need to touch that half of the cache entry.
-      updateCachedPins(selectedProjectCode, selectedFloor, pins)
+      // by a drag, so no need to touch that half of the cache entry. Rebuilt
+      // from finalPos rather than trusting `pins` to already reflect the last
+      // move in this same tick.
+      updateCachedPins(
+        selectedProjectCode,
+        selectedFloor,
+        pins.map((p) => (p.id === pinId ? { ...p, ...finalPos } : p)),
+      )
     } catch (err) {
       console.error('Failed to save pin position:', err)
       setError('Failed to save pin position.')
     }
+  }
+
+  // A cancelled gesture (browser reclaiming the touch, pointer lost) must not
+  // leave a stuck drag ref that makes the next stray pointermove reposition a
+  // pin the user isn't touching.
+  function handlePinPointerCancel() {
+    dragPinIdRef.current = null
+    dragLatestPosRef.current = null
+    setDraggingPinId(null)
   }
 
   async function handlePickerSelect(location: RailingLocation) {
@@ -323,6 +407,89 @@ export default function FloorPlanPage() {
     return unpinned.filter((l) => l.id.toLowerCase().includes(q))
   }, [locations, pinnedLocationIds, pickerQuery])
 
+  // Shared between the desktop (plain) and mobile (pinch/pan-wrapped) render
+  // paths — the image and every pin, unchanged by which wrapper it's inside.
+  // Desktop scales to fit the max-w-5xl container width (native browser zoom
+  // handles the rest); mobile scales to fit the TransformComponent's content
+  // area, which is what "fit-to-screen at 1x" means for the reset control.
+  function renderImageAndPins() {
+    return (
+      <>
+        <img
+          ref={imageRef}
+          src={floorPlan!.imageUrl}
+          alt={`${selectedFloor} floor plan`}
+          onClick={handleImageClick}
+          className={isDesktopStyle ? 'block h-auto w-full rounded-xl' : 'block w-auto h-auto rounded-xl'}
+          style={
+            isDesktopStyle
+              ? {
+                  touchAction: editMode ? 'none' : 'auto',
+                  cursor: editMode && canManagePins ? 'crosshair' : undefined,
+                }
+              : {
+                  // Explicit pixel bounds, not CSS percentages — see
+                  // mobileViewportSize's definition for why. Falls back to
+                  // a generous default before the first measurement lands
+                  // (one layout-effect tick) so nothing renders enormous
+                  // for a single frame.
+                  maxWidth: mobileViewportSize?.width ?? 320,
+                  maxHeight: mobileViewportSize?.height ?? 320,
+                  touchAction: editMode ? 'none' : 'auto',
+                }
+          }
+          draggable={false}
+        />
+        {isDesktopStyle && editMode && canManagePins && isDraggingFileOver && (
+          <div className="pointer-events-none absolute inset-4 flex items-center justify-center rounded-xl border-2 border-dashed border-xa-blue bg-xa-skyblue/50 text-sm font-bold text-xa-navy">
+            Drop to replace this floor plan
+          </div>
+        )}
+        {pins.map((pin) => {
+          const loc = locationById.get(pin.locationId)
+          const color = loc ? STATUS_COLORS[loc.status] : '#8A99A8'
+          const canDrag = editMode && canManagePins
+          return (
+            <button
+              key={pin.id}
+              onPointerDown={(e) => handlePinPointerDown(e, pin.id)}
+              onPointerMove={handlePinPointerMove}
+              onPointerUp={handlePinPointerUp}
+              onPointerCancel={handlePinPointerCancel}
+              onClick={(e) => {
+                e.stopPropagation()
+                handlePinTap(pin)
+              }}
+              className={`${PIN_EXCLUDE_CLASS} absolute flex min-h-[32px] min-w-[32px] -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-full border-2 border-white text-[9px] font-bold text-white shadow-md transition-transform ${
+                isDesktopStyle ? 'hover:scale-110' : ''
+              }`}
+              style={{
+                left: `${pin.xPct * 100}%`,
+                top: `${pin.yPct * 100}%`,
+                backgroundColor: color,
+                touchAction: 'none',
+                cursor: isDesktopStyle && canDrag ? (draggingPinId === pin.id ? 'grabbing' : 'grab') : undefined,
+              }}
+            >
+              {loc ? pinLabel(loc.unitNo) : '?'}
+              {editMode && confirmDeletePinId === pin.id && (
+                <span
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleConfirmDelete(pin.id)
+                  }}
+                  className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-600 text-white"
+                >
+                  <Trash2 size={12} />
+                </span>
+              )}
+            </button>
+          )
+        })}
+      </>
+    )
+  }
+
   const content = (
     <div className="relative flex h-full w-full flex-col bg-[#F5F8FC]">
       <header className="flex shrink-0 items-center gap-2 bg-xa-navy px-3 py-2 text-white">
@@ -357,7 +524,7 @@ export default function FloorPlanPage() {
         <p className="shrink-0 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-600">{error}</p>
       )}
 
-      <div className="relative flex-1 overflow-auto">
+      <div ref={mobileViewportRef} className="relative flex-1 overflow-auto">
         {loading ? (
           <div className="flex h-full items-center justify-center text-sm text-xa-slate">Loading…</div>
         ) : !floorPlan ? (
@@ -391,71 +558,61 @@ export default function FloorPlanPage() {
             )}
             <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileSelected} className="hidden" />
           </div>
-        ) : (
+        ) : isDesktopStyle ? (
           <div
-            className={isDesktopStyle ? 'relative mx-auto max-w-5xl p-4' : 'relative inline-block min-h-full min-w-full'}
-            onDragOver={isDesktopStyle && editMode && canManagePins ? handleDragOver : undefined}
-            onDragLeave={isDesktopStyle && editMode && canManagePins ? handleDragLeave : undefined}
-            onDrop={isDesktopStyle && editMode && canManagePins ? handleFileDrop : undefined}
+            className="relative mx-auto max-w-5xl p-4"
+            onDragOver={editMode && canManagePins ? handleDragOver : undefined}
+            onDragLeave={editMode && canManagePins ? handleDragLeave : undefined}
+            onDrop={editMode && canManagePins ? handleFileDrop : undefined}
           >
-            <img
-              ref={imageRef}
-              src={floorPlan.imageUrl}
-              alt={`${selectedFloor} floor plan`}
-              onClick={handleImageClick}
-              className={isDesktopStyle ? 'block h-auto w-full rounded-xl' : 'block max-w-none'}
-              style={{
-                touchAction: editMode ? 'none' : 'auto',
-                cursor: isDesktopStyle && editMode && canManagePins ? 'crosshair' : undefined,
-              }}
-              draggable={false}
-            />
-            {isDesktopStyle && editMode && canManagePins && isDraggingFileOver && (
-              <div className="pointer-events-none absolute inset-4 flex items-center justify-center rounded-xl border-2 border-dashed border-xa-blue bg-xa-skyblue/50 text-sm font-bold text-xa-navy">
-                Drop to replace this floor plan
-              </div>
-            )}
-            {pins.map((pin) => {
-              const loc = locationById.get(pin.locationId)
-              const color = loc ? STATUS_COLORS[loc.status] : '#8A99A8'
-              const canDrag = editMode && canManagePins
-              return (
-                <button
-                  key={pin.id}
-                  onPointerDown={(e) => handlePinPointerDown(e, pin.id)}
-                  onPointerMove={handlePinPointerMove}
-                  onPointerUp={handlePinPointerUp}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handlePinTap(pin)
-                  }}
-                  className={`absolute flex min-h-[32px] min-w-[32px] -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-full border-2 border-white text-[9px] font-bold text-white shadow-md transition-transform ${
-                    isDesktopStyle ? 'hover:scale-110' : ''
-                  }`}
-                  style={{
-                    left: `${pin.xPct * 100}%`,
-                    top: `${pin.yPct * 100}%`,
-                    backgroundColor: color,
-                    touchAction: 'none',
-                    cursor: isDesktopStyle && canDrag ? (draggingPinId === pin.id ? 'grabbing' : 'grab') : undefined,
-                  }}
-                >
-                  {loc ? pinLabel(loc.unitNo) : '?'}
-                  {editMode && confirmDeletePinId === pin.id && (
-                    <span
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleConfirmDelete(pin.id)
-                      }}
-                      className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-600 text-white"
-                    >
-                      <Trash2 size={12} />
-                    </span>
-                  )}
-                </button>
-              )
-            })}
+            {renderImageAndPins()}
           </div>
+        ) : (
+          // Mobile/forced-landscape: pinch-to-zoom + one-finger pan, via
+          // react-zoom-pan-pinch (no existing zoom/pan dependency in this
+          // codebase to reuse — checked package.json before adding it).
+          // Pins are children of TransformComponent, not siblings positioned
+          // independently, so their xPct/yPct-derived % positions stay
+          // correct at any zoom/pan level automatically — same principle as
+          // the earlier desktop position-locking fix (getBoundingClientRect
+          // already accounts for ancestor transforms). Panning/pinch/
+          // double-click all exclude PIN_EXCLUDE_CLASS so a touch starting
+          // on a pin never also starts a pan or pinch underneath it —
+          // verified against the installed package's actual match logic,
+          // not just its type defs.
+          <TransformWrapper
+            initialScale={1}
+            minScale={1}
+            maxScale={4}
+            limitToBounds
+            centerOnInit
+            doubleClick={{ mode: 'reset', disabled: editMode, excluded: [PIN_EXCLUDE_CLASS] }}
+            panning={{ excluded: [PIN_EXCLUDE_CLASS] }}
+            pinch={{ excluded: [PIN_EXCLUDE_CLASS] }}
+          >
+            {({ resetTransform }) => (
+              <>
+                <TransformComponent
+                  wrapperClass="!w-full !h-full"
+                  contentClass="!flex !h-full !w-full !items-center !justify-center"
+                >
+                  {/* inline-block, not w-full: shrink-wraps to the image's
+                      actual measured size (see mobileViewportSize) so pin
+                      xPct/yPct percentages resolve against the image's real
+                      bounds, not a larger centering box. */}
+                  <div className="relative inline-block">{renderImageAndPins()}</div>
+                </TransformComponent>
+                <button
+                  onClick={() => resetTransform()}
+                  aria-label="Reset zoom"
+                  className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full bg-black/70 px-3 py-2 text-xs font-bold text-white"
+                >
+                  <ZoomOut size={14} />
+                  Reset zoom
+                </button>
+              </>
+            )}
+          </TransformWrapper>
         )}
 
         {floorPlan && canManagePins && editMode && (
