@@ -5,7 +5,9 @@ import { useAuth } from '../context/AuthContext'
 import { useAppData } from '../context/DataContext'
 import type { FloorPlan, LocationPin, RailingLocation } from '../types'
 import {
-  getFloorPlan,
+  getFloorPlanCached,
+  setFloorPlanCache,
+  updateCachedPins,
   uploadFloorPlan,
   getPinsForFloorPlan,
   createPin,
@@ -109,14 +111,18 @@ export default function FloorPlanPage() {
     if (!selectedProjectCode || !selectedFloor) return
     setLoading(true)
     setError('')
+    // getFloorPlanCached resolves immediately (no network call) if this
+    // project+floor was already loaded earlier in the session — only the
+    // location list (status data, changes frequently) is always fetched
+    // fresh, never cached.
     Promise.all([
-      getFloorPlan(selectedProjectCode, selectedFloor),
+      getFloorPlanCached(selectedProjectCode, selectedFloor),
       getLocationsByProject(selectedProjectCode),
     ])
-      .then(async ([plan, allLocations]) => {
-        setFloorPlan(plan)
+      .then(([entry, allLocations]) => {
+        setFloorPlan(entry?.floorPlan ?? null)
+        setPins(entry?.pins ?? [])
         setLocations(allLocations.filter((l) => l.floorLevel === selectedFloor))
-        setPins(plan ? await getPinsForFloorPlan(plan.id) : [])
       })
       .catch((err: unknown) => {
         console.error('Failed to load floor plan:', err)
@@ -133,8 +139,12 @@ export default function FloorPlanPage() {
     setUploading(true)
     try {
       const plan = await uploadFloorPlan(selectedProjectCode, selectedFloor, file, user?.name ?? 'Unknown')
+      const freshPins = await getPinsForFloorPlan(plan.id)
       setFloorPlan(plan)
-      setPins(await getPinsForFloorPlan(plan.id))
+      setPins(freshPins)
+      // Explicit re-upload is the one case that should replace the cached
+      // image — everything else (mount, navigation) should keep using it.
+      setFloorPlanCache(selectedProjectCode, selectedFloor, plan, freshPins)
     } catch (err) {
       console.error('Floor plan upload failed:', err)
       setError(err instanceof Error ? err.message : 'Upload failed. Try again.')
@@ -193,9 +203,12 @@ export default function FloorPlanPage() {
     if (!pinId) return
     ;(e.target as HTMLElement).releasePointerCapture(e.pointerId)
     const pin = pins.find((p) => p.id === pinId)
-    if (!pin) return
+    if (!pin || !selectedProjectCode || !selectedFloor) return
     try {
       await updatePinPosition(pin.id, pin.xPct, pin.yPct)
+      // Pins-only cache refresh — the floor plan image itself is untouched
+      // by a drag, so no need to touch that half of the cache entry.
+      updateCachedPins(selectedProjectCode, selectedFloor, pins)
     } catch (err) {
       console.error('Failed to save pin position:', err)
       setError('Failed to save pin position.')
@@ -203,11 +216,13 @@ export default function FloorPlanPage() {
   }
 
   async function handlePickerSelect(location: RailingLocation) {
-    if (!picker || !floorPlan) return
+    if (!picker || !floorPlan || !selectedProjectCode || !selectedFloor) return
     setError('')
     try {
       const pin = await createPin(floorPlan.id, location.id, picker.xPct, picker.yPct, user?.name ?? 'Unknown')
-      setPins((prev) => [...prev, pin])
+      const nextPins = [...pins, pin]
+      setPins(nextPins)
+      updateCachedPins(selectedProjectCode, selectedFloor, nextPins)
       setPicker(null)
     } catch (err) {
       console.error('Failed to place pin:', err)
@@ -216,10 +231,13 @@ export default function FloorPlanPage() {
   }
 
   async function handleConfirmDelete(pinId: string) {
+    if (!selectedProjectCode || !selectedFloor) return
     setError('')
     try {
       await deletePin(pinId)
-      setPins((prev) => prev.filter((p) => p.id !== pinId))
+      const nextPins = pins.filter((p) => p.id !== pinId)
+      setPins(nextPins)
+      updateCachedPins(selectedProjectCode, selectedFloor, nextPins)
       setConfirmDeletePinId(null)
     } catch (err) {
       console.error('Failed to delete pin:', err)

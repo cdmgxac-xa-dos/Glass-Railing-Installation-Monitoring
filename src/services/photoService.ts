@@ -2,6 +2,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabaseClient'
 import type { LocationPhoto, PhotoCategory } from '../types'
 import { MOCK_PHOTOS } from '../data/mockData'
 import { getLocationById } from './locationService'
+import { compressImage } from '../utils/imageCompression'
 
 // ---------------------------------------------------------------------------
 // Photo service — reads/writes gr_photos + the private glass-railing-photos
@@ -17,22 +18,16 @@ import { getLocationById } from './locationService'
 // once per page visit with no refresh-on-expiry logic, so the TTL needs to
 // outlast a normal session on the Photos page rather than being tight.
 //
-// COMPRESSION: modern phone cameras produce 8-20MB+ photos. Uploading the
+// COMPRESSION: modern phone cameras produce 2-6MB+ photos. Uploading the
 // original file over a mobile/site connection was reported slow in real
-// field testing. compressImage() resizes to a max dimension and re-encodes
-// as JPEG in-browser (Canvas API, no external library) before upload —
-// applies in both modes, so mock-mode previews match what real uploads
-// will look/behave like. Falls back to the original file if compression
-// fails for any reason (e.g. an unsupported format) or doesn't actually
-// shrink the file, rather than blocking the upload outright.
+// field testing. compressImage() (../utils/imageCompression.ts — shared
+// with floorPlanService.ts, not duplicated) resizes to a max dimension and
+// re-encodes as JPEG in-browser before upload — applies in both modes, so
+// mock-mode previews match what real uploads will look/behave like.
 // ---------------------------------------------------------------------------
 
 const BUCKET = 'glass-railing-photos'
 const SIGNED_URL_TTL_SECONDS = 8 * 60 * 60 // 8 hours
-
-const COMPRESS_MAX_DIMENSION = 1600 // px, longest side
-const COMPRESS_QUALITY = 0.82 // JPEG quality, 0-1
-const COMPRESS_SKIP_BELOW_BYTES = 500 * 1024 // don't bother compressing already-small files
 
 interface GrPhotoRow {
   id: string
@@ -65,49 +60,6 @@ async function toLocationPhoto(row: GrPhotoRow): Promise<LocationPhoto> {
 function extensionFor(fileName: string): string {
   const match = fileName.match(/\.([a-zA-Z0-9]+)$/)
   return match ? match[1].toLowerCase() : 'jpg'
-}
-
-// Resizes and re-encodes an image file in-browser before upload. Skips
-// small files outright, and falls back to the original file on any error
-// (unsupported format, decode failure, etc.) rather than blocking the
-// upload — a slightly larger photo is better than a failed one.
-async function compressImage(file: File): Promise<File> {
-  if (file.size < COMPRESS_SKIP_BELOW_BYTES) return file
-
-  try {
-    const bitmap = await createImageBitmap(file)
-
-    const scale = Math.min(1, COMPRESS_MAX_DIMENSION / Math.max(bitmap.width, bitmap.height))
-    const width = Math.round(bitmap.width * scale)
-    const height = Math.round(bitmap.height * scale)
-
-    const canvas = document.createElement('canvas')
-    canvas.width = width
-    canvas.height = height
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return file
-
-    ctx.drawImage(bitmap, 0, 0, width, height)
-    bitmap.close?.()
-
-    const blob: Blob | null = await new Promise((resolve) =>
-      canvas.toBlob(resolve, 'image/jpeg', COMPRESS_QUALITY),
-    )
-    if (!blob) return file
-
-    // Only use the compressed version if it's actually smaller — a tiny or
-    // already-efficient source image could theoretically come back larger
-    // after re-encoding.
-    if (blob.size >= file.size) return file
-
-    // Re-encoded as JPEG regardless of source format, so the extension
-    // needs to match the actual content now, not the original filename.
-    const baseName = file.name.replace(/\.[^./]+$/, '')
-    return new File([blob], `${baseName}.jpg`, { type: 'image/jpeg', lastModified: Date.now() })
-  } catch (err) {
-    console.warn('Photo compression failed, uploading original file instead:', err)
-    return file
-  }
 }
 
 // Mock-only in-memory store.

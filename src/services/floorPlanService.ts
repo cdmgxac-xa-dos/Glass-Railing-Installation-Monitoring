@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient'
 import type { FloorPlan, LocationPin } from '../types'
+import { compressImage } from '../utils/imageCompression'
 
 // ---------------------------------------------------------------------------
 // Floor plan pin service — backed by gr_floor_plans + gr_location_pins, plus
@@ -119,7 +120,11 @@ export async function uploadFloorPlan(
   file: File,
   uploadedBy: string,
 ): Promise<FloorPlan> {
-  const { width, height } = await readImageDimensions(file)
+  // Compress first, then read dimensions off the compressed file — the
+  // stored image_width/image_height should describe what's actually
+  // uploaded, not the original camera capture.
+  const compressedFile = await compressImage(file)
+  const { width, height } = await readImageDimensions(compressedFile)
 
   if (!isSupabaseConfigured) {
     const existingIdx = mockFloorPlans.findIndex((p) => p.projectCode === projectCode && p.floorLevel === floorLevel)
@@ -128,7 +133,7 @@ export async function uploadFloorPlan(
       id: existingIdx >= 0 ? mockFloorPlans[existingIdx].id : `FP-${(mockPlanCounter++).toString().padStart(3, '0')}`,
       projectCode,
       floorLevel,
-      imageUrl: URL.createObjectURL(file),
+      imageUrl: URL.createObjectURL(compressedFile),
       imageWidth: width,
       imageHeight: height,
       uploadedBy,
@@ -140,10 +145,10 @@ export async function uploadFloorPlan(
     return plan
   }
 
-  const storagePath = `${projectCode}/${floorLevel}.${extensionFor(file.name)}`
+  const storagePath = `${projectCode}/${floorLevel}.${extensionFor(compressedFile.name)}`
 
-  const { error: uploadError } = await supabase!.storage.from(BUCKET).upload(storagePath, file, {
-    contentType: file.type || undefined,
+  const { error: uploadError } = await supabase!.storage.from(BUCKET).upload(storagePath, compressedFile, {
+    contentType: compressedFile.type || undefined,
     upsert: true, // re-upload replaces the existing image at the same path
   })
   if (uploadError) throw uploadError
@@ -250,4 +255,68 @@ export async function deletePin(pinId: string): Promise<void> {
 
   const { error } = await supabase!.from('gr_location_pins').delete().eq('id', pinId)
   if (error) throw error
+}
+
+// ---------------------------------------------------------------------------
+// Session cache — floor plan image + pins, keyed by "projectCode:floorLevel".
+// Exists specifically for FloorPlanPage.tsx, so navigating away and back to
+// the same floor within a session renders immediately without a network
+// wait, rather than re-fetching an image that rarely changes on every mount
+// (field connectivity is often data-metered or spotty). Deliberately NOT
+// used by getFloorPlan()/getPinsForFloorPlan() directly — reportPdfBuilder.ts
+// also calls those and needs genuinely fresh data every report run, not a
+// UI-session cache. In-memory only, resets on a real page reload — same
+// lifetime as every other mock store in this app; browser HTTP caching on
+// the signed Storage URL is a separate, complementary layer this doesn't
+// replace.
+// ---------------------------------------------------------------------------
+
+interface FloorPlanCacheEntry {
+  floorPlan: FloorPlan
+  pins: LocationPin[]
+}
+
+const floorPlanCache = new Map<string, FloorPlanCacheEntry>()
+
+function cacheKey(projectCode: string, floorLevel: string): string {
+  return `${projectCode}:${floorLevel}`
+}
+
+// Returns the cached entry immediately (no network call) if present;
+// otherwise fetches once and populates the cache for next time. Returns
+// null if no floor plan exists for this project+floor yet (not cached as
+// an absence — a plan uploaded by someone else mid-session should still
+// show up on the next mount).
+export async function getFloorPlanCached(
+  projectCode: string,
+  floorLevel: string,
+): Promise<FloorPlanCacheEntry | null> {
+  const cached = floorPlanCache.get(cacheKey(projectCode, floorLevel))
+  if (cached) return cached
+
+  const floorPlan = await getFloorPlan(projectCode, floorLevel)
+  if (!floorPlan) return null
+  const pins = await getPinsForFloorPlan(floorPlan.id)
+  const entry: FloorPlanCacheEntry = { floorPlan, pins }
+  floorPlanCache.set(cacheKey(projectCode, floorLevel), entry)
+  return entry
+}
+
+// Called after an explicit upload/re-upload — the one case that should
+// invalidate the cached image.
+export function setFloorPlanCache(
+  projectCode: string,
+  floorLevel: string,
+  floorPlan: FloorPlan,
+  pins: LocationPin[],
+): void {
+  floorPlanCache.set(cacheKey(projectCode, floorLevel), { floorPlan, pins })
+}
+
+// Called after any pin create/move/delete — refreshes only the pins half of
+// the cache entry, not the floor plan image.
+export function updateCachedPins(projectCode: string, floorLevel: string, pins: LocationPin[]): void {
+  const key = cacheKey(projectCode, floorLevel)
+  const existing = floorPlanCache.get(key)
+  if (existing) floorPlanCache.set(key, { ...existing, pins })
 }
