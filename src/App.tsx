@@ -6,6 +6,7 @@ import SplashPage from './pages/SplashPage'
 import LoginPage from './pages/LoginPage'
 import ProjectSelectionPage from './pages/ProjectSelectionPage'
 import ProjectDashboardPage from './pages/ProjectDashboardPage'
+import DashboardPage from './pages/DashboardPage'
 import FloorSelectionPage from './pages/FloorSelectionPage'
 import UnitTypeSelectionPage from './pages/UnitTypeSelectionPage'
 import LocationCardsPage from './pages/LocationCardsPage'
@@ -49,7 +50,7 @@ export default function App() {
         }
       >
         <Route path="/project" element={<ProjectDashboardPage />} />
-        <Route path="/dashboard" element={<ProjectDashboardPage />} />
+        <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/floors" element={<FloorSelectionPage />} />
         <Route path="/unit-types" element={<UnitTypeSelectionPage />} />
         <Route path="/floor-plan" element={<FloorPlanPage />} />

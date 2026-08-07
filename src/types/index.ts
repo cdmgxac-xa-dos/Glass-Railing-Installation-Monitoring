@@ -274,6 +274,30 @@ export interface TimelineEvent {
   remarks: string
 }
 
+// ---- Recent activity --------------------------------------------------------
+
+// There is no dedicated events/activity-log table. Activity is derived at
+// query time from the updated_at / created_at / inspected_at / uploaded_at
+// columns already present on the gr_* tables (see activityService.ts), so
+// this type is a normalised view over several different row shapes rather
+// than a mapping of one table.
+export type ActivityType =
+  | 'status_change'
+  | 'qc_inspection'
+  | 'punch_list'
+  | 'photo_upload'
+  | 'pin_placed'
+  | 'floor_plan_uploaded'
+
+export interface ActivityEntry {
+  id: string // `${sourceTable}-${sourceId}-${timestamp}` — unique feed key
+  type: ActivityType
+  description: string // human-readable, e.g. 'Status changed to Punch List'
+  locationTagId?: string // e.g. 'GR-021' — absent for project-level events
+  locationUnitNo?: string // e.g. '601'
+  timestamp: string // ISO datetime
+}
+
 // ---- Dashboard aggregate shapes -------------------------------------------
 
 export interface StatusCounts {
