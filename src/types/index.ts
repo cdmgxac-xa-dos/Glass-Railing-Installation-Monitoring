@@ -80,6 +80,11 @@ export interface AppUser {
   // features that need to distinguish between them — like floor-plan pin
   // management — read this instead of `role`. Undefined in mock mode.
   roleCode?: string
+  // Real-mode only: true for a newly created account whose password was
+  // set by an admin rather than chosen by the person themselves. While
+  // true, ProtectedRoute forces every route to /change-password until
+  // they set their own. Undefined/false in mock mode.
+  mustChangePassword?: boolean
 }
 
 export interface Project {

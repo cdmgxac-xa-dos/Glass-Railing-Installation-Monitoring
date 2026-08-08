@@ -41,6 +41,7 @@ const ROLE_CODE_MAP: Record<string, UserRole> = {
   qc_officer: 'QC Inspector',
   field_pic: 'QC Inspector',
   safety_officer: 'QC Inspector',
+  warehouseman: 'Foreman', // new site-level role, no dedicated UI role yet — reuses the unused 'Foreman' bucket
   projects: 'Project Manager',
   owner: 'Owner',
 }
@@ -61,6 +62,7 @@ const MOCK_USERS: Record<UserRole, AppUser> = {
 interface HydrationRow {
   id: string
   login_email: string
+  must_change_password: boolean
   full_name: string | null
   role_code: string
 }
@@ -68,7 +70,7 @@ interface HydrationRow {
 async function hydrateAppUser(authUserId: string): Promise<AppUser> {
   const { data, error } = await supabase!
     .from('app_users')
-    .select('id, login_email, role:roles(role_code), employee:employees(full_name)')
+    .select('id, login_email, must_change_password, role:roles(role_code), employee:employees(full_name)')
     .eq('id', authUserId)
     .single()
 
@@ -78,6 +80,7 @@ async function hydrateAppUser(authUserId: string): Promise<AppUser> {
   const row = data as unknown as {
     id: string
     login_email: string
+    must_change_password: boolean
     role: { role_code: string } | null
     employee: { full_name: string | null } | null
   }
@@ -100,6 +103,7 @@ async function hydrateAppUser(authUserId: string): Promise<AppUser> {
     role: mappedRole,
     email: row.login_email,
     roleCode,
+    mustChangePassword: row.must_change_password,
   }
 }
 
@@ -119,6 +123,19 @@ export async function login(email: string, password: string): Promise<AppUser> {
   if (!data.user) throw new Error('Login succeeded but no user was returned.')
 
   return hydrateAppUser(data.user.id)
+}
+
+// Used by ChangePasswordPage — sets the account's real password (chosen by
+// the person themselves, not the admin-set temporary one) and clears the
+// must-change flag server-side via a narrow security-definer RPC that can
+// only ever touch the calling user's own row (see
+// xa_dos_migrations/21_new_field_crew_accounts.sql, mark_password_changed()).
+export async function changePassword(newPassword: string): Promise<void> {
+  if (!isSupabaseConfigured) return
+  const { error: updateError } = await supabase!.auth.updateUser({ password: newPassword })
+  if (updateError) throw updateError
+  const { error: rpcError } = await supabase!.rpc('mark_password_changed')
+  if (rpcError) throw rpcError
 }
 
 export async function logout(): Promise<void> {

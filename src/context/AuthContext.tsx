@@ -1,7 +1,13 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { AppUser, UserRole } from '../types'
 import { isSupabaseConfigured, supabase } from '../lib/supabaseClient'
-import { getCurrentUser, getUserForRole, login as loginService, logout as logoutService } from '../services/authService'
+import {
+  getCurrentUser,
+  getUserForRole,
+  login as loginService,
+  logout as logoutService,
+  changePassword as changePasswordService,
+} from '../services/authService'
 
 interface AuthContextValue {
   user: AppUser | null
@@ -10,6 +16,7 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<void>
   logout: () => void
   switchRole: (role: UserRole) => void
+  changePassword: (newPassword: string) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
@@ -68,6 +75,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null)
       },
       switchRole: (role) => setUser(getUserForRole(role)),
+      changePassword: async (newPassword) => {
+        await changePasswordService(newPassword)
+        setUser((prev) => (prev ? { ...prev, mustChangePassword: false } : prev))
+      },
     }),
     [user, isLoading],
   )

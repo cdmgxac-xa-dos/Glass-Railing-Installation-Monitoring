@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import type { UserRole } from '../types'
 
@@ -13,6 +13,7 @@ interface ProtectedRouteProps {
 // Installer accounts).
 export default function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
   const { user, isAuthenticated, isLoading } = useAuth()
+  const location = useLocation()
 
   // Real-mode session restoration (checking for an existing Supabase
   // session on page load) is async — without this, a refresh would
@@ -21,6 +22,12 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
   if (isLoading) return <div className="p-6 text-sm text-xa-slate">Loading…</div>
 
   if (!isAuthenticated) return <Navigate to="/login" replace />
+
+  // New accounts created with an admin-set temporary password must set
+  // their own before touching anything else in the app.
+  if (user?.mustChangePassword && location.pathname !== '/change-password') {
+    return <Navigate to="/change-password" replace />
+  }
 
   if (allowedRoles && user && !allowedRoles.includes(user.role)) {
     return <Navigate to="/project" replace />

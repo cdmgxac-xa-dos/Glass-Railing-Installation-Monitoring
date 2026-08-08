@@ -4,6 +4,7 @@ import ProtectedRoute from './routes/ProtectedRoute'
 
 import SplashPage from './pages/SplashPage'
 import LoginPage from './pages/LoginPage'
+import ChangePasswordPage from './pages/ChangePasswordPage'
 import ProjectSelectionPage from './pages/ProjectSelectionPage'
 import ProjectDashboardPage from './pages/ProjectDashboardPage'
 import DashboardPage from './pages/DashboardPage'
@@ -30,6 +31,16 @@ export default function App() {
       {/* Public */}
       <Route path="/" element={<SplashPage />} />
       <Route path="/login" element={<LoginPage />} />
+
+      {/* Forced password change is full-screen, outside the bottom-nav shell */}
+      <Route
+        path="/change-password"
+        element={
+          <ProtectedRoute>
+            <ChangePasswordPage />
+          </ProtectedRoute>
+        }
+      />
 
       {/* Project selection is full-screen, outside the bottom-nav shell */}
       <Route
