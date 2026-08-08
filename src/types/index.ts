@@ -12,6 +12,10 @@ export type UnitType =
   | 'Front End Unit'
   | 'Rear End Unit'
   | 'Balcony Partition'
+  | 'Studio Unit'
+  | '1 BR'
+  | '2 BR'
+  | 'Beachfront'
 
 export const UNIT_TYPES: UnitType[] = [
   'Studio',
@@ -20,6 +24,10 @@ export const UNIT_TYPES: UnitType[] = [
   'Front End Unit',
   'Rear End Unit',
   'Balcony Partition',
+  'Studio Unit',
+  '1 BR',
+  '2 BR',
+  'Beachfront',
 ]
 
 export type LocationStatus =
@@ -47,11 +55,13 @@ export type BracketSystem =
   | 'Bracket System A'
   | 'Bracket System B'
   | 'Bracket System C'
+  | 'CKB-4735'
 
 export const BRACKET_SYSTEMS: BracketSystem[] = [
   'Bracket System A',
   'Bracket System B',
   'Bracket System C',
+  'CKB-4735',
 ]
 
 export type AssignedTeam = 'Team A' | 'Team B' | 'Team C' | 'Team D'
