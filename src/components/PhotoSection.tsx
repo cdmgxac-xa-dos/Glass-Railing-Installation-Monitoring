@@ -41,7 +41,12 @@ export default function PhotoSection({ category, photos, onAdd, onRemove }: Phot
 
         {photos.map((photo) => (
           <div key={photo.id} className="group relative aspect-square overflow-hidden rounded-xl border border-xa-line">
-            <img src={photo.previewUrl} alt={photo.fileName} className="h-full w-full object-cover" />
+            <img
+              src={photo.thumbnailUrl}
+              alt={photo.fileName}
+              loading="lazy"
+              className="h-full w-full object-cover"
+            />
             <button
               onClick={() => onRemove(photo.id)}
               aria-label="Remove photo"

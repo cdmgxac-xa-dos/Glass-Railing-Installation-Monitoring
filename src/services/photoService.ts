@@ -2,7 +2,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabaseClient'
 import type { LocationPhoto, PhotoCategory } from '../types'
 import { MOCK_PHOTOS } from '../data/mockData'
 import { getLocationById } from './locationService'
-import { compressImage } from '../utils/imageCompression'
+import { compressPhotoForUpload } from '../utils/imageCompression'
 
 // ---------------------------------------------------------------------------
 // Photo service — reads/writes gr_photos + the private glass-railing-photos
@@ -20,10 +20,11 @@ import { compressImage } from '../utils/imageCompression'
 //
 // COMPRESSION: modern phone cameras produce 2-6MB+ photos. Uploading the
 // original file over a mobile/site connection was reported slow in real
-// field testing. compressImage() (../utils/imageCompression.ts — shared
-// with floorPlanService.ts, not duplicated) resizes to a max dimension and
-// re-encodes as JPEG in-browser before upload — applies in both modes, so
-// mock-mode previews match what real uploads will look/behave like.
+// field testing. compressPhotoForUpload() (../utils/imageCompression.ts)
+// produces a ~400-600KB main image plus a ~50KB thumbnail in-browser, and
+// both are uploaded — the original 2-6MB+ file never leaves the device.
+// Applies in both modes, so mock-mode previews match what real uploads
+// will look/behave like.
 // ---------------------------------------------------------------------------
 
 const BUCKET = 'glass-railing-photos'
@@ -34,6 +35,9 @@ interface GrPhotoRow {
   location_id: string
   category: PhotoCategory
   storage_path: string
+  // Nullable: rows uploaded before the thumbnail tier existed have none.
+  // toLocationPhoto() falls back to the main image's signed URL for those.
+  thumbnail_path: string | null
   file_name: string
   uploaded_by: string | null
   uploaded_at: string
@@ -46,11 +50,21 @@ async function toLocationPhoto(row: GrPhotoRow): Promise<LocationPhoto> {
 
   if (error) throw error
 
+  let thumbnailUrl = data.signedUrl
+  if (row.thumbnail_path) {
+    const { data: thumbData, error: thumbError } = await supabase!.storage
+      .from(BUCKET)
+      .createSignedUrl(row.thumbnail_path, SIGNED_URL_TTL_SECONDS)
+    if (thumbError) throw thumbError
+    thumbnailUrl = thumbData.signedUrl
+  }
+
   return {
     id: row.id,
     locationId: row.location_id,
     category: row.category,
     previewUrl: data.signedUrl,
+    thumbnailUrl,
     fileName: row.file_name,
     uploadedBy: row.uploaded_by ?? 'Unknown',
     uploadedAt: row.uploaded_at,
@@ -87,15 +101,16 @@ export async function addPhoto(
   file: File,
   uploadedBy: string,
 ): Promise<LocationPhoto> {
-  const compressedFile = await compressImage(file)
+  const { main, thumbnail } = await compressPhotoForUpload(file)
 
   if (!isSupabaseConfigured) {
     const photo: LocationPhoto = {
       id: `PH-${(mockCounter++).toString().padStart(4, '0')}`,
       locationId,
       category,
-      previewUrl: URL.createObjectURL(compressedFile),
-      fileName: compressedFile.name,
+      previewUrl: URL.createObjectURL(main),
+      thumbnailUrl: URL.createObjectURL(thumbnail),
+      fileName: main.name,
       uploadedBy,
       uploadedAt: new Date().toISOString(),
     }
@@ -112,12 +127,21 @@ export async function addPhoto(
   }
 
   const uuid = crypto.randomUUID()
-  const storagePath = `${location.projectCode}/${locationId}/${uuid}.${extensionFor(compressedFile.name)}`
+  const storagePath = `${location.projectCode}/${locationId}/${uuid}.${extensionFor(main.name)}`
+  const thumbnailPath = `${location.projectCode}/${locationId}/${uuid}_thumb.${extensionFor(thumbnail.name)}`
 
-  const { error: uploadError } = await supabase!.storage.from(BUCKET).upload(storagePath, compressedFile, {
-    contentType: compressedFile.type || undefined,
+  const { error: uploadError } = await supabase!.storage.from(BUCKET).upload(storagePath, main, {
+    contentType: main.type || undefined,
   })
   if (uploadError) throw uploadError
+
+  const { error: thumbUploadError } = await supabase!.storage.from(BUCKET).upload(thumbnailPath, thumbnail, {
+    contentType: thumbnail.type || undefined,
+  })
+  if (thumbUploadError) {
+    await supabase!.storage.from(BUCKET).remove([storagePath])
+    throw thumbUploadError
+  }
 
   const { data: insertedRow, error: insertError } = await supabase!
     .from('gr_photos')
@@ -125,16 +149,18 @@ export async function addPhoto(
       location_id: locationId,
       category,
       storage_path: storagePath,
-      file_name: compressedFile.name,
+      thumbnail_path: thumbnailPath,
+      file_name: main.name,
       uploaded_by: uploadedBy,
     })
     .select('*')
     .single()
 
   if (insertError) {
-    // Storage object was uploaded but the row insert failed — clean up the
-    // orphaned object rather than leaving it unreferenced in the bucket.
-    await supabase!.storage.from(BUCKET).remove([storagePath])
+    // Storage objects were uploaded but the row insert failed — clean up
+    // the orphaned objects rather than leaving them unreferenced in the
+    // bucket.
+    await supabase!.storage.from(BUCKET).remove([storagePath, thumbnailPath])
     throw insertError
   }
 
@@ -146,16 +172,17 @@ export async function removePhoto(photoId: string): Promise<void> {
     const idx = mockStore.findIndex((p) => p.id === photoId)
     if (idx >= 0) {
       URL.revokeObjectURL(mockStore[idx].previewUrl)
+      URL.revokeObjectURL(mockStore[idx].thumbnailUrl)
       mockStore.splice(idx, 1)
     }
     return
   }
 
-  // Need the storage_path to delete the Storage object — the DB row id
-  // alone isn't enough, so fetch first, then delete both.
+  // Need the storage_path/thumbnail_path to delete the Storage objects —
+  // the DB row id alone isn't enough, so fetch first, then delete both.
   const { data: row, error: fetchError } = await supabase!
     .from('gr_photos')
-    .select('storage_path')
+    .select('storage_path, thumbnail_path')
     .eq('id', photoId)
     .maybeSingle()
 
@@ -166,7 +193,8 @@ export async function removePhoto(photoId: string): Promise<void> {
   if (deleteError) throw deleteError
 
   // Row delete succeeded; best-effort Storage cleanup after. If this fails,
-  // the DB is already consistent (no dangling reference) — an orphaned
-  // Storage object is a minor cleanup issue, not a data-integrity one.
-  await supabase!.storage.from(BUCKET).remove([row.storage_path])
+  // the DB is already consistent (no dangling reference) — orphaned
+  // Storage objects are a minor cleanup issue, not a data-integrity one.
+  const pathsToRemove = [row.storage_path, ...(row.thumbnail_path ? [row.thumbnail_path] : [])]
+  await supabase!.storage.from(BUCKET).remove(pathsToRemove)
 }

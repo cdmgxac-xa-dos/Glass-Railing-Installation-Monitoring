@@ -97,7 +97,8 @@ create table if not exists gr_photos (
   id uuid primary key default gen_random_uuid(),
   location_id text not null references gr_locations(id) on delete cascade,
   category text not null check (category in ('Before', 'During', 'After', 'Punch List')),
-  storage_path text not null,             -- e.g. 'PR-001/GR-021/<uuid>.jpg' in the glass-railing-photos bucket
+  storage_path text not null,             -- main ~400-600KB image, e.g. 'PR-001/GR-021/<uuid>.jpg' in the glass-railing-photos bucket
+  thumbnail_path text,                    -- ~50KB thumbnail, e.g. 'PR-001/GR-021/<uuid>_thumb.jpg'; nullable — added 2026-08-09, see 04_gr_photos_thumbnail.sql, null on rows uploaded before then
   file_name text not null,
   uploaded_by text,                       -- no FK yet (see note 5 above)
   uploaded_at timestamptz not null default now()
@@ -312,14 +313,20 @@ create policy "gr_activity_logs_insert" on gr_activity_logs
 
 -- gr_report_history: Reports feature (Phase 1). Deliberately gated by
 -- gr_is_owner_or_pm() rather than gr_can_read()/gr_can_write() — reports
--- are Owner/Project Manager-only, unlike every other gr_* table which the
--- wider field_ops population can at least read.
+-- are Owner/Project Manager/PIC-only, unlike every other gr_* table which
+-- the wider field_ops population can at least read. Widened 2026-08-09
+-- (see 03_pic_reports_access.sql) to also include field_pic — PIC now has
+-- Production Kanban + Reports access. Name kept as-is even though it now
+-- covers PIC too, since it's only ever referenced by the Reports feature
+-- below (gr_report_history + glass-railing-reports bucket + the reports
+-- clause in 02_project_scoping_rls.sql), not treated as a general-purpose
+-- "is this an owner/PM" check elsewhere.
 create or replace function public.gr_is_owner_or_pm()
 returns boolean
 language sql stable security definer
 set search_path to 'public'
 as $$
-  select gr_current_role_code() in ('owner', 'projects')
+  select gr_current_role_code() in ('owner', 'projects', 'field_pic')
 $$;
 
 create table if not exists gr_report_history (
@@ -363,7 +370,7 @@ create policy "gr_report_history_insert" on gr_report_history
 -- Path convention: {project_code}/{uuid}.pdf
 -- Private; served via signed URLs from reportService, same as photos.
 -- Deliberately gated by gr_is_owner_or_pm(), NOT gr_can_read()/gr_can_write()
--- — reports are Owner/Project Manager-only.
+-- — reports are Owner/Project Manager/PIC-only.
 -- ---------------------------------------------------------------------------
 insert into storage.buckets (id, name, public)
 values ('glass-railing-reports', 'glass-railing-reports', false)

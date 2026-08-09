@@ -4,11 +4,17 @@ import { useAuth } from '../context/AuthContext'
 import { useAppData } from '../context/DataContext'
 import PageHeader from '../components/PageHeader'
 
-// Kept in sync with each route's ProtectedRoute allowedRoles in App.tsx.
+// Kept in sync with each route's ProtectedRoute allowedRoles/allowedRoleCodes
+// in App.tsx. Kanban and Reports also open for role_code 'field_pic'
+// specifically (not the whole 'QC Inspector' UserRole tier it collapses
+// into — see App.tsx and ProtectedRoute.tsx), so those two need the same
+// roleCode-aware check FloorPlanPage.tsx uses for pin management.
 const OWNER_DASHBOARD_ROLES = ['Project Manager', 'Owner']
 const KANBAN_ROLES = ['Project Manager', 'Owner', 'Foreman']
+const KANBAN_ROLE_CODES = ['field_pic']
 const PUNCH_LIST_ROLES = ['Project Manager', 'Owner', 'Foreman', 'QC Inspector']
 const REPORTS_ROLES = ['Project Manager', 'Owner']
+const REPORTS_ROLE_CODES = ['field_pic']
 
 export default function MorePage() {
   const navigate = useNavigate()
@@ -16,9 +22,13 @@ export default function MorePage() {
   const { clearSelection } = useAppData()
 
   const canSeeOwnerDashboard = user ? OWNER_DASHBOARD_ROLES.includes(user.role) : false
-  const canSeeKanban = user ? KANBAN_ROLES.includes(user.role) : false
+  const canSeeKanban = user
+    ? KANBAN_ROLES.includes(user.role) || (!!user.roleCode && KANBAN_ROLE_CODES.includes(user.roleCode))
+    : false
   const canSeePunchList = user ? PUNCH_LIST_ROLES.includes(user.role) : false
-  const canSeeReports = user ? REPORTS_ROLES.includes(user.role) : false
+  const canSeeReports = user
+    ? REPORTS_ROLES.includes(user.role) || (!!user.roleCode && REPORTS_ROLE_CODES.includes(user.roleCode))
+    : false
 
   return (
     <div className="min-h-screen bg-[#F5F8FC]">

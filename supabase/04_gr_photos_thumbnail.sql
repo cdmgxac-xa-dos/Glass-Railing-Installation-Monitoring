@@ -1,0 +1,23 @@
+-- ============================================================================
+-- Adds the thumbnail tier to gr_photos.
+--
+-- Every photo capture in the app (Before/During/After on PhotosPage, and
+-- Punch List photos from QCInspectionPage — both go through
+-- photoService.ts's addPhoto()) now compresses two images client-side
+-- before upload: a ~400-600KB main image (existing storage_path column)
+-- and a new ~50KB thumbnail. Grid/list views load the thumbnail; the full
+-- main image only loads when a photo is opened. The original 3-8MB camera
+-- file is never uploaded in either case — it's discarded on-device right
+-- after the two compressed copies are produced.
+--
+-- thumbnail_path is nullable: rows uploaded before this migration have no
+-- thumbnail. photoService.ts's toLocationPhoto() already handles that —
+-- falls back to the main image's signed URL when thumbnail_path is null,
+-- so old photos keep displaying (just without the bandwidth savings) and
+-- nothing needs a backfill pass.
+--
+-- Run this once against the live Supabase project (SQL editor), after
+-- schema.sql has already been applied. Idempotent — safe to re-run.
+-- ============================================================================
+
+alter table gr_photos add column if not exists thumbnail_path text;

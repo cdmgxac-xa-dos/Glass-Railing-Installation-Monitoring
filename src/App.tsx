@@ -89,7 +89,7 @@ export default function App() {
         <Route
           path="/kanban"
           element={
-            <ProtectedRoute allowedRoles={['Project Manager', 'Owner', 'Foreman']}>
+            <ProtectedRoute allowedRoles={['Project Manager', 'Owner', 'Foreman']} allowedRoleCodes={['field_pic']}>
               <KanbanBoardPage />
             </ProtectedRoute>
           }
@@ -97,7 +97,7 @@ export default function App() {
         <Route
           path="/reports"
           element={
-            <ProtectedRoute allowedRoles={['Project Manager', 'Owner']}>
+            <ProtectedRoute allowedRoles={['Project Manager', 'Owner']} allowedRoleCodes={['field_pic']}>
               <ReportsPage />
             </ProtectedRoute>
           }

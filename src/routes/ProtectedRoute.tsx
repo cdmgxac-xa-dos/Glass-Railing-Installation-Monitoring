@@ -6,12 +6,22 @@ import type { UserRole } from '../types'
 interface ProtectedRouteProps {
   children: ReactNode
   allowedRoles?: UserRole[]
+  // Real-mode-only escape hatch for granting access by the underlying DB
+  // role_code instead of the collapsed UserRole — needed when a route
+  // should open for one specific role_code (e.g. field_pic) without also
+  // opening it for every other role_code that collapses onto the same
+  // UserRole ('QC Inspector' covers qc_officer/field_pic/safety_officer,
+  // see authService.ts's ROLE_CODE_MAP). Undefined/no roleCode in mock
+  // mode simply never matches, same as the pin-manager check in
+  // FloorPlanPage.tsx.
+  allowedRoleCodes?: string[]
 }
 
 // Wraps a route so it requires login, and optionally restricts it to
 // specific roles (e.g. Owner Dashboard and Kanban are hidden from
-// Installer accounts).
-export default function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
+// Installer accounts). A route passing both allowedRoles and
+// allowedRoleCodes opens for either match.
+export default function ProtectedRoute({ children, allowedRoles, allowedRoleCodes }: ProtectedRouteProps) {
   const { user, isAuthenticated, isLoading } = useAuth()
   const location = useLocation()
 
@@ -29,8 +39,12 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
     return <Navigate to="/change-password" replace />
   }
 
-  if (allowedRoles && user && !allowedRoles.includes(user.role)) {
-    return <Navigate to="/project" replace />
+  if (allowedRoles && user) {
+    const roleMatches = allowedRoles.includes(user.role)
+    const roleCodeMatches = allowedRoleCodes && user.roleCode ? allowedRoleCodes.includes(user.roleCode) : false
+    if (!roleMatches && !roleCodeMatches) {
+      return <Navigate to="/project" replace />
+    }
   }
 
   return <>{children}</>

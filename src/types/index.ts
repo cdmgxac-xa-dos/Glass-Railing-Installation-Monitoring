@@ -200,7 +200,8 @@ export interface LocationPhoto {
   id: string
   locationId: string
   category: PhotoCategory
-  previewUrl: string
+  previewUrl: string // full ~400-600KB main image — used for detail views/report PDFs
+  thumbnailUrl: string // ~50KB thumbnail — used for grid/list display
   fileName: string
   uploadedBy: string
   uploadedAt: string
