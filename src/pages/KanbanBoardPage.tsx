@@ -63,7 +63,9 @@ export default function KanbanBoardPage() {
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-sm font-extrabold text-xa-navy">{location.reference ?? location.id}</p>
-                <p className="text-xs text-xa-slate">{location.floorLevel} &middot; {location.unitNo}</p>
+                <p className="text-xs text-xa-slate">
+                  {location.floorLevel} &middot; {location.unitNo ?? location.windowTag ?? '—'}
+                </p>
               </div>
               <StatusBadge value={location.status} size="sm" />
             </div>

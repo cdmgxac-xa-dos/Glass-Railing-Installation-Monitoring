@@ -374,7 +374,7 @@ export async function buildReportPdf(
       startY: cursorY,
       head: [detailHead],
       body: locations.map((l) => {
-        const row = [l.reference ?? l.id, l.floorLevel, l.unitNo, l.status]
+        const row = [l.reference ?? l.id, l.floorLevel, l.unitNo ?? l.windowTag ?? '—', l.status]
         if (config.includeFullDetailPhotos) row.push('', '', '') // drawn via didDrawCell below
         return row
       }),
@@ -507,7 +507,8 @@ async function renderFloorPlanCanvas(
         ctx.fillStyle = '#FFFFFF'
         ctx.textAlign = 'center'
         ctx.textBaseline = 'middle'
-        const label = loc.unitNo.length > 6 ? `${loc.unitNo.slice(0, 5)}…` : loc.unitNo
+        const unitLabel = loc.unitNo ?? loc.windowTag ?? loc.reference ?? loc.id
+        const label = unitLabel.length > 6 ? `${unitLabel.slice(0, 5)}…` : unitLabel
         ctx.fillText(label, cx, cy)
       }
     }

@@ -67,16 +67,18 @@ function scopeNameFor(scope: string): string {
 
 // Raw shape of a gr_locations row as returned by Supabase (snake_case).
 // total_linear_meters/total_glass_panels/bracket_system/priority/
-// assigned_team are all nullable at the DB level as of
+// assigned_team/unit_no are all nullable at the DB level as of
 // 07_doors_windows_locations.sql — Doors & Windows rows never populate the
-// Railing-specific measurements, and Priority/Assigned Team are commonly
-// blank on freshly-imported registers before crews are dispatched.
+// Railing-specific measurements, Priority/Assigned Team are commonly
+// blank on freshly-imported registers before crews are dispatched, and
+// unit_no specifically is blank on most of the Spinnaker Windows register
+// (a real gap in that register, not a pattern worth avoiding).
 interface GrLocationRow {
   id: string
   reference: string | null
   project_code: string
   floor_level: string
-  unit_no: string
+  unit_no: string | null
   unit_type: RailingLocation['unitType']
   total_linear_meters: number | null
   total_glass_panels: number | null
@@ -99,7 +101,7 @@ function mapRow(row: GrLocationRow): RailingLocation {
     projectCode: row.project_code,
     projectName: projectNameFor(row.project_code),
     floorLevel: row.floor_level,
-    unitNo: row.unit_no,
+    unitNo: row.unit_no ?? undefined,
     unitType: row.unit_type,
     totalLinearMeters: row.total_linear_meters ?? undefined,
     totalGlassPanels: row.total_glass_panels ?? undefined,

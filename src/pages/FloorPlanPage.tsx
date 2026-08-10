@@ -402,7 +402,7 @@ export default function FloorPlanPage() {
     const unpinned = locations.filter((l) => !pinnedLocationIds.has(l.id))
     const q = pickerQuery.trim().toLowerCase()
     if (!q) return unpinned
-    const byUnitNo = unpinned.filter((l) => l.unitNo.toLowerCase().includes(q))
+    const byUnitNo = unpinned.filter((l) => (l.unitNo ?? '').toLowerCase().includes(q))
     if (byUnitNo.length > 0) return byUnitNo
     return unpinned.filter((l) => l.id.toLowerCase().includes(q) || (l.reference ?? '').toLowerCase().includes(q))
   }, [locations, pinnedLocationIds, pickerQuery])
@@ -471,7 +471,7 @@ export default function FloorPlanPage() {
                 cursor: isDesktopStyle && canDrag ? (draggingPinId === pin.id ? 'grabbing' : 'grab') : undefined,
               }}
             >
-              {loc ? pinLabel(loc.unitNo) : '?'}
+              {loc ? pinLabel(loc.unitNo ?? loc.windowTag ?? loc.reference ?? loc.id) : '?'}
               {editMode && confirmDeletePinId === pin.id && (
                 <span
                   onClick={(e) => {
@@ -659,7 +659,7 @@ export default function FloorPlanPage() {
                     onClick={() => handlePickerSelect(loc)}
                     className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm hover:bg-slate-50"
                   >
-                    <span className="font-semibold text-xa-navy">{loc.unitNo}</span>
+                    <span className="font-semibold text-xa-navy">{loc.unitNo ?? loc.windowTag ?? '—'}</span>
                     <span className="text-xs text-xa-slate">{loc.reference ?? loc.id}</span>
                   </button>
                 ))

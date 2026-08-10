@@ -58,6 +58,14 @@ alter table gr_locations alter column bracket_system drop not null;
 alter table gr_locations alter column priority drop not null;
 alter table gr_locations alter column assigned_team drop not null;
 
+-- Added after the first run: 464 of the 539 Spinnaker Windows register
+-- rows have no "Location / Unit No." filled in at all (spread across
+-- nearly every floor and unit type, not just common areas — a real gap
+-- in that register, not a pattern worth special-casing). Window Tag is
+-- populated for every one of those rows, so the app falls back to that
+-- for display rather than requiring a fabricated unit number.
+alter table gr_locations alter column unit_no drop not null;
+
 -- Constraint name is Postgres's auto-generated default for an unnamed
 -- inline check on this column (table_column_check) — using IF EXISTS in
 -- case the live constraint was ever named differently.

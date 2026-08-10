@@ -131,7 +131,11 @@ export interface RailingLocation {
   projectCode: string // e.g. PR-001
   projectName: string
   floorLevel: string // e.g. "12F", "GF", "Roof Deck"
-  unitNo: string // e.g. "Unit 1201"
+  // Optional: real registers can leave this blank (a majority of the
+  // Spinnaker Windows register does, across nearly every floor and unit
+  // type) — display should fall back to `windowTag` or similar rather
+  // than assume this is always present.
+  unitNo?: string // e.g. "Unit 1201"
   unitType: UnitType
   // Railing-specific measurements. Optional because Doors & Windows
   // locations don't have them — a window has no "linear meters of

@@ -48,7 +48,8 @@ export default function LocationCardsPage() {
         return (
           l.id.toLowerCase().includes(q) ||
           (l.reference ?? '').toLowerCase().includes(q) ||
-          l.unitNo.toLowerCase().includes(q)
+          (l.unitNo ?? '').toLowerCase().includes(q) ||
+          (l.windowTag ?? '').toLowerCase().includes(q)
         )
       })
       .sort((a, b) => {

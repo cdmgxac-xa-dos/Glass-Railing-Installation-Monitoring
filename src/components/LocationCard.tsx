@@ -28,7 +28,9 @@ export default function LocationCard({ location, onClick }: LocationCardProps) {
               </span>
             )}
           </div>
-          <p className="mt-0.5 truncate text-sm font-semibold text-slate-800">{location.unitNo}</p>
+          <p className="mt-0.5 truncate text-sm font-semibold text-slate-800">
+            {location.unitNo ?? location.windowTag ?? '—'}
+          </p>
           <p className="truncate text-xs text-xa-slate">{location.floorLevel} &middot; {location.unitType}</p>
         </div>
         <ChevronRight size={20} className="mt-1 shrink-0 text-slate-300" />

@@ -44,12 +44,15 @@ export default function WorkCardPage() {
 
   return (
     <div className="min-h-screen bg-[#F5F8FC]">
-      <PageHeader title={location.reference ?? location.id} subtitle={`${location.floorLevel} · ${location.unitNo}`} />
+      <PageHeader
+        title={location.reference ?? location.id}
+        subtitle={`${location.floorLevel} · ${location.unitNo ?? location.windowTag ?? '—'}`}
+      />
 
       <div className="space-y-5 px-4 py-5">
         <div className="rounded-2xl border border-xa-line bg-white p-4 shadow-card">
           <div className="flex items-center justify-between">
-            <p className="text-sm font-extrabold text-xa-navy">{location.unitNo}</p>
+            <p className="text-sm font-extrabold text-xa-navy">{location.unitNo ?? location.windowTag ?? '—'}</p>
             <StatusBadge value={location.status} />
           </div>
           <p className="mt-0.5 text-xs text-xa-slate">{location.unitType} &middot; {location.floorLevel}</p>

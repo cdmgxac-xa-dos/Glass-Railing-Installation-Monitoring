@@ -7,5 +7,9 @@ dist
 *.tsbuildinfo
 supabase/.temp
 
+# tsc -b compiles vite.config.ts to these when run without --noEmit
+vite.config.js
+vite.config.d.ts
+
 # Local Netlify folder
 .netlify
