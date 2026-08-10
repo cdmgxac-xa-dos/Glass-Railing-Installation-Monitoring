@@ -1,9 +1,9 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Check, X, Paperclip, Loader2 } from 'lucide-react'
-import type { Priority, QCResult } from '../types'
-import { PRIORITIES, QC_CHECKLIST_ITEMS } from '../types'
-import { submitQCInspection } from '../services/qcService'
+import type { Priority, QCChecklistItemDef, QCResult } from '../types'
+import { PRIORITIES } from '../types'
+import { getQcItemsForLocation, submitQCInspection } from '../services/qcService'
 import { addPhoto } from '../services/photoService'
 import { useAuth } from '../context/AuthContext'
 import PageHeader from '../components/PageHeader'
@@ -14,9 +14,8 @@ export default function QCInspectionPage() {
   const { user } = useAuth()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const [itemResults, setItemResults] = useState<Record<string, boolean>>(
-    Object.fromEntries(QC_CHECKLIST_ITEMS.map((i) => [i.key, true])),
-  )
+  const [items, setItems] = useState<QCChecklistItemDef[]>([])
+  const [itemResults, setItemResults] = useState<Record<string, boolean>>({})
   const [result, setResult] = useState<QCResult | null>(null)
   const [issueDescription, setIssueDescription] = useState('')
   const [priority, setPriority] = useState<Priority>('Medium')
@@ -26,6 +25,13 @@ export default function QCInspectionPage() {
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    getQcItemsForLocation(locationId).then((scopeItems) => {
+      setItems(scopeItems)
+      setItemResults(Object.fromEntries(scopeItems.map((i) => [i.key, true])))
+    })
+  }, [locationId])
 
   function toggleItem(key: string) {
     setItemResults((prev) => ({ ...prev, [key]: !prev[key] }))
@@ -113,7 +119,7 @@ export default function QCInspectionPage() {
         <div className="rounded-2xl border border-xa-line bg-white p-4 shadow-card">
           <p className="mb-3 text-sm font-bold text-xa-navy">QC checklist</p>
           <div className="space-y-2">
-            {QC_CHECKLIST_ITEMS.map((item) => (
+            {items.map((item) => (
               <button
                 key={item.key}
                 onClick={() => toggleItem(item.key)}

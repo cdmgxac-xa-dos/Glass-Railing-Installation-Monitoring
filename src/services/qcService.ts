@@ -1,9 +1,17 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient'
-import type { Priority, QCInspectionRecord, QCResult } from '../types'
+import type { Priority, QCChecklistItemDef, QCInspectionRecord, QCResult } from '../types'
 import { MOCK_QC_RECORDS } from '../data/mockData'
 import { addPunchListItem } from './punchListService'
 import { getLocationById, getLocationsByProject, updateLocationStatus } from './locationService'
 import { addTimelineEvent } from './timelineService'
+import { getQcItemsForScope } from './templateService'
+
+// Which QC checklist items apply to a location, based on its installation
+// scope — 'RAILING' when the location has no scope set (mock mode).
+export async function getQcItemsForLocation(locationId: string): Promise<QCChecklistItemDef[]> {
+  const location = await getLocationById(locationId)
+  return getQcItemsForScope(location?.scope ?? 'RAILING')
+}
 
 // ---------------------------------------------------------------------------
 // QC inspection service — backed by gr_qc_inspections.

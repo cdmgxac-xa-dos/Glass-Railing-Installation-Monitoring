@@ -59,6 +59,7 @@ interface GrLocationRow {
   status: LocationStatus
   remarks: string | null
   updated_at: string
+  scope: string
 }
 
 function mapRow(row: GrLocationRow): RailingLocation {
@@ -77,6 +78,7 @@ function mapRow(row: GrLocationRow): RailingLocation {
     status: row.status,
     remarks: row.remarks ?? '',
     updatedAt: row.updated_at,
+    scope: row.scope,
   }
 }
 

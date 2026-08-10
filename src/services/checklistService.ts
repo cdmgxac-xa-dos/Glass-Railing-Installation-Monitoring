@@ -1,8 +1,8 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient'
-import type { ChecklistState, ChecklistStageKey } from '../types'
-import { CHECKLIST_STAGES } from '../types'
+import type { ChecklistStageDef, ChecklistState, ChecklistStageKey } from '../types'
 import { buildInitialChecklist } from '../data/mockData'
 import { getLocationById } from './locationService'
+import { getChecklistStagesForScope } from './templateService'
 
 // ---------------------------------------------------------------------------
 // Checklist service — reads/writes the 10-stage installation checklist per
@@ -32,9 +32,9 @@ interface GrInstallationUpdateRow {
   remark: string | null
 }
 
-function emptyChecklist(): ChecklistState {
+function emptyChecklist(stages: ChecklistStageDef[]): ChecklistState {
   const state = {} as ChecklistState
-  CHECKLIST_STAGES.forEach(({ key }) => {
+  stages.forEach(({ key }) => {
     state[key] = {
       stage: key,
       isCompleted: false,
@@ -46,18 +46,33 @@ function emptyChecklist(): ChecklistState {
   return state
 }
 
+// Which checklist stages apply to a location, based on its installation
+// scope — 'RAILING' when the location has no scope set (mock mode) or the
+// lookup can't find a location (shouldn't happen in practice, but fails
+// safe to the original behavior rather than throwing).
+async function stagesForLocation(locationId: string): Promise<ChecklistStageDef[]> {
+  const location = await getLocationById(locationId)
+  return getChecklistStagesForScope(location?.scope ?? 'RAILING')
+}
+
+export async function getChecklistStagesForLocation(locationId: string): Promise<ChecklistStageDef[]> {
+  return stagesForLocation(locationId)
+}
+
 // Mock-only in-memory per-location checklist store.
 const mockChecklistStore = new Map<string, ChecklistState>()
 
 export async function getChecklist(locationId: string): Promise<ChecklistState> {
+  const stages = await stagesForLocation(locationId)
+
   if (!isSupabaseConfigured) {
     if (!mockChecklistStore.has(locationId)) {
       const location = await getLocationById(locationId)
       if (location) {
-        mockChecklistStore.set(locationId, buildInitialChecklist(location))
+        mockChecklistStore.set(locationId, buildInitialChecklist(location, stages))
       }
     }
-    return mockChecklistStore.get(locationId) ?? emptyChecklist()
+    return mockChecklistStore.get(locationId) ?? emptyChecklist(stages)
   }
 
   const { data, error } = await supabase!
@@ -67,7 +82,7 @@ export async function getChecklist(locationId: string): Promise<ChecklistState> 
 
   if (error) throw error
 
-  const state = emptyChecklist()
+  const state = emptyChecklist(stages)
   ;(data as GrInstallationUpdateRow[]).forEach((row) => {
     state[row.stage] = {
       stage: row.stage,

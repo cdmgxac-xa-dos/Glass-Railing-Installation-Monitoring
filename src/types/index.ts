@@ -121,6 +121,11 @@ export interface RailingLocation {
   status: LocationStatus
   remarks: string
   updatedAt: string // ISO datetime
+  // Installation scope ('RAILING', 'DOORS_WINDOWS', ...) — optional because
+  // mock-mode location objects predate the scope column and are always
+  // Railing; real-mode rows always have it (see gr_locations.scope).
+  // Anything reading this should fall back to 'RAILING' when absent.
+  scope?: string
 }
 
 // ---- Floor plan pins --------------------------------------------------------
@@ -150,17 +155,15 @@ export interface LocationPin {
 
 // ---- Installation checklist -----------------------------------------------
 
-export type ChecklistStageKey =
-  | 'areaReleased'
-  | 'bracketInstalled'
-  | 'glassDelivered'
-  | 'glassInstalled'
-  | 'alignmentChecked'
-  | 'handrailInstalled'
-  | 'accessoriesCompleted'
-  | 'sealantCompleted'
-  | 'finalInspection'
-  | 'completed'
+// A plain string, not a closed union: which keys are valid depends on the
+// location's installation scope (see checklist_templates /
+// supabase/05_scope_foundation.sql, 06_doors_windows_templates.sql).
+// CHECKLIST_STAGES below is the Railing scope's own list, and remains the
+// literal source of truth for that scope's stage keys/order/labels — it
+// mirrors checklist_templates' 'RAILING' row exactly, kept here as the
+// fallback used in mock/offline mode. DOORS_WINDOWS_CHECKLIST_STAGES is the
+// same idea for that scope.
+export type ChecklistStageKey = string
 
 export interface ChecklistStageDef {
   key: ChecklistStageKey
@@ -177,6 +180,26 @@ export const CHECKLIST_STAGES: ChecklistStageDef[] = [
   { key: 'accessoriesCompleted', label: 'Accessories Completed' },
   { key: 'sealantCompleted', label: 'Sealant or Grouting Completed' },
   { key: 'finalInspection', label: 'Final Inspection' },
+  { key: 'completed', label: 'Completed' },
+]
+
+// Doors & Windows scope's checklist (owner's expansion plan, Section 13).
+// One shared 12-step flow for both door and window items rather than
+// separate door/window variants — the plan's item-specific extra
+// checkpoints (water test, operation test, lock/handle test) are folded
+// into "Testing Completed" rather than branched into their own templates.
+export const DOORS_WINDOWS_CHECKLIST_STAGES: ChecklistStageDef[] = [
+  { key: 'openingReleased', label: 'Opening Released' },
+  { key: 'openingDimensionChecked', label: 'Opening Dimension Checked' },
+  { key: 'frameDelivered', label: 'Frame Delivered' },
+  { key: 'frameInstalled', label: 'Frame Installed' },
+  { key: 'frameAlignmentChecked', label: 'Frame Alignment Checked' },
+  { key: 'glassInstalled', label: 'Glass Installed' },
+  { key: 'hardwareInstalled', label: 'Hardware Installed' },
+  { key: 'adjustmentCompleted', label: 'Adjustment Completed' },
+  { key: 'sealantCompleted', label: 'Sealant Completed' },
+  { key: 'testingCompleted', label: 'Testing Completed' },
+  { key: 'qcInspectionPassed', label: 'QC Inspection Passed' },
   { key: 'completed', label: 'Completed' },
 ]
 
@@ -227,6 +250,25 @@ export const QC_CHECKLIST_ITEMS: QCChecklistItemDef[] = [
   { key: 'sealantQuality', label: 'Sealant quality' },
   { key: 'scratchesChips', label: 'Glass scratches or chips' },
   { key: 'stabilityMovement', label: 'Stability or movement' },
+  { key: 'missingAccessories', label: 'Missing accessories' },
+]
+
+// Doors & Windows scope's QC checklist — one shared list for both door and
+// window items, covering the same ground as the Railing list (condition,
+// alignment, fastening, sealant) plus door/window-specific checks the plan
+// calls out (operation smoothness, lock/handle function, water test).
+export const DOORS_WINDOWS_QC_ITEMS: QCChecklistItemDef[] = [
+  { key: 'openingDimensionAccuracy', label: 'Opening dimension accuracy' },
+  { key: 'frameCondition', label: 'Frame condition (no dents or scratches)' },
+  { key: 'frameAlignment', label: 'Frame alignment (level and plumb)' },
+  { key: 'frameAnchoring', label: 'Frame anchoring and fastening' },
+  { key: 'glassCondition', label: 'Glass panel condition' },
+  { key: 'hardwareInstallation', label: 'Hardware installation' },
+  { key: 'operationSmoothness', label: 'Operation smoothness' },
+  { key: 'lockHandleFunction', label: 'Lock and handle function' },
+  { key: 'sealantQuality', label: 'Sealant and weatherproofing quality' },
+  { key: 'waterTightness', label: 'Water test result' },
+  { key: 'gapClearance', label: 'Gap and clearance consistency' },
   { key: 'missingAccessories', label: 'Missing accessories' },
 ]
 

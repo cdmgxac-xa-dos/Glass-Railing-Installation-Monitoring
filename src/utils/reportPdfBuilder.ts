@@ -259,6 +259,12 @@ export async function buildReportPdf(
         body: punchItems.map((item) => {
           const loc = locations.find((l) => l.id === item.locationId)
           const failedQc = latestFailedQcByLocation.get(item.locationId)
+          // Labels QC_CHECKLIST_ITEMS is the Railing scope's QC item list
+          // only (see src/types/index.ts) — a Doors & Windows QC failure's
+          // itemResults keys won't match it, so this silently renders no
+          // failed-item labels for that scope. Reports aren't scope-aware
+          // yet (that's Phase 4 of the Field Installation Monitoring
+          // expansion); harmless today since every project is Railings-only.
           const failedItemLabels = failedQc
             ? QC_CHECKLIST_ITEMS.filter((d) => failedQc.itemResults[d.key] === false)
                 .map((d) => d.label)

@@ -1,4 +1,5 @@
 import type {
+  ChecklistStageDef,
   ChecklistState,
   LocationComment,
   LocationPhoto,
@@ -311,21 +312,29 @@ export const MOCK_LOCATIONS: RailingLocation[] = [
 // Checklist mock state (per location, generated on demand — see service)
 // ---------------------------------------------------------------------------
 
-export function buildInitialChecklist(location: RailingLocation): ChecklistState {
+// stages defaults to the Railing list for existing callers/tests; pass the
+// location's actual scope's stages (see checklistService.ts) so a future
+// mock Doors & Windows location gets its own 12-step progress instead of
+// being force-fit into Railing's 10 keys.
+export function buildInitialChecklist(
+  location: RailingLocation,
+  stages: ChecklistStageDef[] = CHECKLIST_STAGES,
+): ChecklistState {
   // For non-"Not Started" locations, mark a realistic number of early
-  // stages complete so the mock feels alive.
-  const progressIndex: Record<LocationStatus, number> = {
+  // stages complete so the mock feels alive. Scaled to the actual stage
+  // count rather than assuming 10, since scopes have different lengths.
+  const progressFraction: Record<LocationStatus, number> = {
     'Not Started': 0,
-    'In Progress': 5,
-    'QC Inspection': 8,
-    'Punch List': 8,
-    'On Hold': 3,
-    Completed: 10,
+    'In Progress': 0.5,
+    'QC Inspection': 0.8,
+    'Punch List': 0.8,
+    'On Hold': 0.3,
+    Completed: 1,
   }
-  const completedCount = progressIndex[location.status]
+  const completedCount = Math.round(progressFraction[location.status] * stages.length)
 
   const state = {} as ChecklistState
-  CHECKLIST_STAGES.forEach((stage, i) => {
+  stages.forEach((stage, i) => {
     const isCompleted = i < completedCount
     state[stage.key] = {
       stage: stage.key,

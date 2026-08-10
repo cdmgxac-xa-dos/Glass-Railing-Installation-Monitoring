@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import type { ChecklistState } from '../types'
-import { CHECKLIST_STAGES } from '../types'
-import { getChecklist, updateChecklistStage } from '../services/checklistService'
+import type { ChecklistStageDef, ChecklistState } from '../types'
+import { getChecklist, getChecklistStagesForLocation, updateChecklistStage } from '../services/checklistService'
 import { useAuth } from '../context/AuthContext'
 import PageHeader from '../components/PageHeader'
 import ChecklistItem from '../components/ChecklistItem'
@@ -10,13 +9,17 @@ import ChecklistItem from '../components/ChecklistItem'
 export default function InstallationChecklistPage() {
   const { locationId = '' } = useParams()
   const { user } = useAuth()
+  const [stages, setStages] = useState<ChecklistStageDef[]>([])
   const [checklist, setChecklist] = useState<ChecklistState | null>(null)
 
   useEffect(() => {
-    getChecklist(locationId).then(setChecklist)
+    Promise.all([getChecklistStagesForLocation(locationId), getChecklist(locationId)]).then(([s, c]) => {
+      setStages(s)
+      setChecklist(c)
+    })
   }, [locationId])
 
-  async function handleToggleComplete(stageKey: (typeof CHECKLIST_STAGES)[number]['key']) {
+  async function handleToggleComplete(stageKey: string) {
     if (!checklist) return
     const isCompleted = !checklist[stageKey].isCompleted
     const updated = await updateChecklistStage(locationId, stageKey, {
@@ -26,7 +29,7 @@ export default function InstallationChecklistPage() {
     setChecklist({ ...updated })
   }
 
-  async function handleSaveRemark(stageKey: (typeof CHECKLIST_STAGES)[number]['key'], remark: string) {
+  async function handleSaveRemark(stageKey: string, remark: string) {
     if (!checklist) return
     const updated = await updateChecklistStage(locationId, stageKey, {
       remark,
@@ -36,7 +39,7 @@ export default function InstallationChecklistPage() {
   }
 
   const completedCount = checklist ? Object.values(checklist).filter((c) => c.isCompleted).length : 0
-  const pct = checklist ? Math.round((completedCount / CHECKLIST_STAGES.length) * 100) : 0
+  const pct = checklist && stages.length ? Math.round((completedCount / stages.length) * 100) : 0
 
   return (
     <div className="min-h-screen bg-[#F5F8FC]">
@@ -46,7 +49,7 @@ export default function InstallationChecklistPage() {
         <div className="rounded-2xl border border-xa-line bg-white p-4 shadow-card">
           <div className="flex items-center justify-between text-sm">
             <p className="font-semibold text-xa-slate">Stages completed</p>
-            <p className="font-extrabold text-xa-navy">{completedCount}/{CHECKLIST_STAGES.length}</p>
+            <p className="font-extrabold text-xa-navy">{completedCount}/{stages.length}</p>
           </div>
           <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-100">
             <div className="h-full rounded-full bg-xa-blue transition-all" style={{ width: `${pct}%` }} />
@@ -56,7 +59,7 @@ export default function InstallationChecklistPage() {
 
       <div className="space-y-3 px-4 py-5">
         {checklist &&
-          CHECKLIST_STAGES.map((stage, i) => (
+          stages.map((stage, i) => (
             <ChecklistItem
               key={stage.key}
               index={i + 1}
