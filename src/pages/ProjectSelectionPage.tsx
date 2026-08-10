@@ -8,7 +8,7 @@ import { useAuth } from '../context/AuthContext'
 
 export default function ProjectSelectionPage() {
   const navigate = useNavigate()
-  const { setSelectedProjectCode, setSelectedFloor, setSelectedUnitType } = useAppData()
+  const { setSelectedProjectCode, setSelectedScope, setSelectedFloor, setSelectedUnitType } = useAppData()
   const { user } = useAuth()
   const [projects, setProjects] = useState<Project[]>([])
 
@@ -19,9 +19,10 @@ export default function ProjectSelectionPage() {
   function selectProject(project: Project) {
     if (project.totalLocations === 0) return
     setSelectedProjectCode(project.code)
+    setSelectedScope(null)
     setSelectedFloor(null)
     setSelectedUnitType(null)
-    navigate('/project')
+    navigate('/scope')
   }
 
   return (

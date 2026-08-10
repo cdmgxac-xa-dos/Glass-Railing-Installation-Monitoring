@@ -6,6 +6,12 @@ import { createContext, useContext, useMemo, useState, type ReactNode } from 're
 interface DataContextValue {
   selectedProjectCode: string | null
   setSelectedProjectCode: (code: string | null) => void
+  // Installation scope chosen for the current project (e.g. 'RAILING',
+  // 'DOORS_WINDOWS' — see installation_scopes). Null until ScopeSelectionPage
+  // resolves it, which happens automatically (no screen shown) whenever a
+  // project only has data for one scope — true for every project today.
+  selectedScope: string | null
+  setSelectedScope: (scope: string | null) => void
   selectedFloor: string | null
   setSelectedFloor: (floor: string | null) => void
   selectedUnitType: string | null
@@ -17,11 +23,13 @@ const DataContext = createContext<DataContextValue | undefined>(undefined)
 
 export function DataProvider({ children }: { children: ReactNode }) {
   const [selectedProjectCode, setSelectedProjectCode] = useState<string | null>(null)
+  const [selectedScope, setSelectedScope] = useState<string | null>(null)
   const [selectedFloor, setSelectedFloor] = useState<string | null>(null)
   const [selectedUnitType, setSelectedUnitType] = useState<string | null>(null)
 
   function clearSelection() {
     setSelectedProjectCode(null)
+    setSelectedScope(null)
     setSelectedFloor(null)
     setSelectedUnitType(null)
   }
@@ -30,13 +38,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
     () => ({
       selectedProjectCode,
       setSelectedProjectCode,
+      selectedScope,
+      setSelectedScope,
       selectedFloor,
       setSelectedFloor,
       selectedUnitType,
       setSelectedUnitType,
       clearSelection,
     }),
-    [selectedProjectCode, selectedFloor, selectedUnitType],
+    [selectedProjectCode, selectedScope, selectedFloor, selectedUnitType],
   )
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>

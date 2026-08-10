@@ -6,6 +6,7 @@ import SplashPage from './pages/SplashPage'
 import LoginPage from './pages/LoginPage'
 import ChangePasswordPage from './pages/ChangePasswordPage'
 import ProjectSelectionPage from './pages/ProjectSelectionPage'
+import ScopeSelectionPage from './pages/ScopeSelectionPage'
 import ProjectDashboardPage from './pages/ProjectDashboardPage'
 import DashboardPage from './pages/DashboardPage'
 import FloorSelectionPage from './pages/FloorSelectionPage'
@@ -48,6 +49,19 @@ export default function App() {
         element={
           <ProtectedRoute>
             <ProjectSelectionPage />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Scope selection (Railings vs Doors & Windows) sits between project
+          selection and the dashboard, also full-screen. Auto-continues with
+          no visible screen whenever a project only has one scope's worth of
+          data, which is every project today. */}
+      <Route
+        path="/scope"
+        element={
+          <ProtectedRoute>
+            <ScopeSelectionPage />
           </ProtectedRoute>
         }
       />
