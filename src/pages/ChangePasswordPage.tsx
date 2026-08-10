@@ -40,7 +40,7 @@ export default function ChangePasswordPage() {
   return (
     <div className="flex min-h-screen flex-col justify-center bg-white px-6 py-12">
       <div className="mb-8 text-center">
-        <p className="text-xs font-bold uppercase tracking-[0.2em] text-xa-blue">XA DOS</p>
+        <p className="text-xs font-bold uppercase tracking-[0.2em] text-xa-blue">XA-DOS</p>
         <h1 className="mt-1 text-2xl font-extrabold text-xa-navy">Set a new password</h1>
         <p className="mt-1 text-sm text-xa-slate">
           For your security, set your own password before continuing.
