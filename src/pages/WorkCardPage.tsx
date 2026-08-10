@@ -12,6 +12,8 @@ import {
   Layers,
   Wrench,
   Users,
+  Frame,
+  Building2,
 } from 'lucide-react'
 import type { RailingLocation } from '../types'
 import { getLocationById } from '../services/locationService'
@@ -38,9 +40,11 @@ export default function WorkCardPage() {
 
   if (!location) return <div className="p-6 text-sm text-xa-slate">Loading location…</div>
 
+  const isDoorsWindows = location.scope === 'DOORS_WINDOWS'
+
   return (
     <div className="min-h-screen bg-[#F5F8FC]">
-      <PageHeader title={location.id} subtitle={`${location.floorLevel} · ${location.unitNo}`} />
+      <PageHeader title={location.reference ?? location.id} subtitle={`${location.floorLevel} · ${location.unitNo}`} />
 
       <div className="space-y-5 px-4 py-5">
         <div className="rounded-2xl border border-xa-line bg-white p-4 shadow-card">
@@ -51,18 +55,39 @@ export default function WorkCardPage() {
           <p className="mt-0.5 text-xs text-xa-slate">{location.unitType} &middot; {location.floorLevel}</p>
 
           <div className="mt-4 grid grid-cols-2 gap-3 text-xs text-xa-slate">
-            <div className="flex items-center gap-1.5">
-              <Ruler size={14} className="text-xa-blue" /> {location.totalLinearMeters.toFixed(1)} linear meters
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Layers size={14} className="text-xa-blue" /> {location.totalGlassPanels} glass panels
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Wrench size={14} className="text-xa-blue" /> {location.bracketSystem}
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Users size={14} className="text-xa-blue" /> {location.assignedTeam}
-            </div>
+            {isDoorsWindows ? (
+              <>
+                <div className="flex items-center gap-1.5">
+                  <Frame size={14} className="text-xa-blue" /> {location.windowTag ?? '—'}
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Wrench size={14} className="text-xa-blue" /> {location.windowSystem ?? '—'}
+                </div>
+                {location.towerBuilding && (
+                  <div className="flex items-center gap-1.5">
+                    <Building2 size={14} className="text-xa-blue" /> {location.towerBuilding}
+                  </div>
+                )}
+                <div className="flex items-center gap-1.5">
+                  <Users size={14} className="text-xa-blue" /> {location.assignedTeam ?? 'Unassigned'}
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-1.5">
+                  <Ruler size={14} className="text-xa-blue" /> {location.totalLinearMeters?.toFixed(1) ?? '—'} linear meters
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Layers size={14} className="text-xa-blue" /> {location.totalGlassPanels ?? '—'} glass panels
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Wrench size={14} className="text-xa-blue" /> {location.bracketSystem ?? '—'}
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Users size={14} className="text-xa-blue" /> {location.assignedTeam ?? 'Unassigned'}
+                </div>
+              </>
+            )}
           </div>
 
           {location.remarks && location.remarks !== 'None' && (

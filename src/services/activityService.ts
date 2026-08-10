@@ -69,7 +69,7 @@ type LocationLookup = Map<string, RailingLocation>
 
 function locationFields(lookup: LocationLookup, locationId: string) {
   const loc = lookup.get(locationId)
-  return { locationTagId: loc?.id ?? locationId, locationUnitNo: loc?.unitNo }
+  return { locationTagId: loc?.reference ?? loc?.id ?? locationId, locationUnitNo: loc?.unitNo }
 }
 
 // --- gr_locations: status changes -------------------------------------------
@@ -87,7 +87,7 @@ function statusChangeEntries(locations: RailingLocation[], since: string): Activ
       id: `gr_locations-${l.id}-${l.updatedAt}`,
       type: 'status_change' as const,
       description: `Status changed to ${l.status}`,
-      locationTagId: l.id,
+      locationTagId: l.reference ?? l.id,
       locationUnitNo: l.unitNo,
       timestamp: l.updatedAt,
     }))

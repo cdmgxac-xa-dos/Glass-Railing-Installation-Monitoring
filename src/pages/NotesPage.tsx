@@ -4,11 +4,13 @@ import { Send } from 'lucide-react'
 import type { LocationComment } from '../types'
 import { addComment, getCommentsForLocation } from '../services/commentService'
 import { useAuth } from '../context/AuthContext'
+import { useLocationReference } from '../hooks/useLocationReference'
 import PageHeader from '../components/PageHeader'
 
 export default function NotesPage() {
   const { locationId = '' } = useParams()
   const { user } = useAuth()
+  const reference = useLocationReference(locationId)
   const [notes, setNotes] = useState<LocationComment[]>([])
   const [draft, setDraft] = useState('')
 
@@ -25,7 +27,7 @@ export default function NotesPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-[#F5F8FC]">
-      <PageHeader title="Notes & Comments" subtitle={locationId} />
+      <PageHeader title="Notes & Comments" subtitle={reference} />
 
       <div className="flex-1 space-y-3 px-4 py-5">
         {notes.length === 0 && <p className="py-10 text-center text-sm text-xa-slate">No notes yet for this location.</p>}

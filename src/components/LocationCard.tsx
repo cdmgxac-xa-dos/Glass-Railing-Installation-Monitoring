@@ -1,4 +1,4 @@
-import { ChevronRight, Ruler, Layers, Users, Wrench } from 'lucide-react'
+import { ChevronRight, Ruler, Layers, Users, Wrench, Frame, Building2 } from 'lucide-react'
 import type { RailingLocation } from '../types'
 import StatusBadge from './StatusBadge'
 
@@ -8,6 +8,11 @@ interface LocationCardProps {
 }
 
 export default function LocationCard({ location, onClick }: LocationCardProps) {
+  // Railing cards keep showing exactly what they always have (linear
+  // meters, panels, bracket system) — this branch only changes what
+  // renders for a Doors & Windows location, which has none of those.
+  const isDoorsWindows = location.scope === 'DOORS_WINDOWS'
+
   return (
     <button
       onClick={onClick}
@@ -16,7 +21,7 @@ export default function LocationCard({ location, onClick }: LocationCardProps) {
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-extrabold text-xa-navy">{location.id}</span>
+            <span className="text-sm font-extrabold text-xa-navy">{location.reference ?? location.id}</span>
             {location.priority === 'High' && (
               <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-bold uppercase text-red-600">
                 High priority
@@ -30,27 +35,52 @@ export default function LocationCard({ location, onClick }: LocationCardProps) {
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-xa-slate">
-        <div className="flex items-center gap-1.5">
-          <Ruler size={14} className="text-xa-blue" />
-          {location.totalLinearMeters.toFixed(1)} LM
-        </div>
-        <div className="flex items-center gap-1.5">
-          <Layers size={14} className="text-xa-blue" />
-          {location.totalGlassPanels} panels
-        </div>
-        <div className="flex items-center gap-1.5">
-          <Wrench size={14} className="text-xa-blue" />
-          {location.bracketSystem.replace('Bracket System ', 'System ')}
-        </div>
-        <div className="flex items-center gap-1.5">
-          <Users size={14} className="text-xa-blue" />
-          {location.assignedTeam}
-        </div>
+        {isDoorsWindows ? (
+          <>
+            <div className="flex items-center gap-1.5">
+              <Frame size={14} className="text-xa-blue" />
+              {location.windowTag ?? '—'}
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Wrench size={14} className="text-xa-blue" />
+              {location.windowSystem ?? '—'}
+            </div>
+            {location.towerBuilding && (
+              <div className="flex items-center gap-1.5">
+                <Building2 size={14} className="text-xa-blue" />
+                {location.towerBuilding}
+              </div>
+            )}
+            <div className="flex items-center gap-1.5">
+              <Users size={14} className="text-xa-blue" />
+              {location.assignedTeam ?? 'Unassigned'}
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="flex items-center gap-1.5">
+              <Ruler size={14} className="text-xa-blue" />
+              {location.totalLinearMeters?.toFixed(1) ?? '—'} LM
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Layers size={14} className="text-xa-blue" />
+              {location.totalGlassPanels ?? '—'} panels
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Wrench size={14} className="text-xa-blue" />
+              {location.bracketSystem?.replace('Bracket System ', 'System ') ?? '—'}
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Users size={14} className="text-xa-blue" />
+              {location.assignedTeam ?? 'Unassigned'}
+            </div>
+          </>
+        )}
       </div>
 
       <div className="mt-3 flex items-center justify-between border-t border-xa-line pt-3">
         <StatusBadge value={location.status} size="sm" />
-        <span className="text-[11px] font-medium text-slate-400">{location.priority} priority</span>
+        <span className="text-[11px] font-medium text-slate-400">{location.priority ?? 'Unassigned'} priority</span>
       </div>
     </button>
   )

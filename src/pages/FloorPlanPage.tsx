@@ -404,7 +404,7 @@ export default function FloorPlanPage() {
     if (!q) return unpinned
     const byUnitNo = unpinned.filter((l) => l.unitNo.toLowerCase().includes(q))
     if (byUnitNo.length > 0) return byUnitNo
-    return unpinned.filter((l) => l.id.toLowerCase().includes(q))
+    return unpinned.filter((l) => l.id.toLowerCase().includes(q) || (l.reference ?? '').toLowerCase().includes(q))
   }, [locations, pinnedLocationIds, pickerQuery])
 
   // Shared between the desktop (plain) and mobile (pinch/pan-wrapped) render
@@ -660,7 +660,7 @@ export default function FloorPlanPage() {
                     className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm hover:bg-slate-50"
                   >
                     <span className="font-semibold text-xa-navy">{loc.unitNo}</span>
-                    <span className="text-xs text-xa-slate">{loc.id}</span>
+                    <span className="text-xs text-xa-slate">{loc.reference ?? loc.id}</span>
                   </button>
                 ))
               )}

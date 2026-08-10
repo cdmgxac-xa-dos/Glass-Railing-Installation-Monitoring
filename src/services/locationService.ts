@@ -32,11 +32,17 @@ import { LOCATION_STATUSES } from '../types'
 // file's logic.
 // ---------------------------------------------------------------------------
 
-// No real `projects` table exists yet in XA DOS (only a placeholder
-// comment in the estimating schema), so gr_locations.project_code is a
-// plain text column with nothing to join against. This lookup exists only
-// to preserve the RailingLocation.projectName field the UI already
-// expects; swap it for a real join once a `projects` table exists.
+// Fallback only — getProjects() (projectService.ts) now sources the real
+// name via gr_get_visible_projects() once a real `projects` table exists,
+// so this only matters for code paths that build a RailingLocation.
+// projectName without going through that RPC. 8-digit codes confirmed
+// against the real xadOS-app foundation schema (../../xa_dos_migrations/
+// 19_project_roster_and_scoping.sql: "project_code ... e.g.
+// 'PRJ-26070002'", and 18_quo_to_prj_on_award.sql's QUO->PRJ identity
+// transition, which preserves the full digit sequence) — the master
+// register Excel files (XA_DOS_*_Master_Register.xlsx) have a typo in
+// their own Project Code column (missing a digit, 'PRJ-2607002'), which
+// the Phase 5 data-load migration overrides rather than trusts verbatim.
 const PROJECT_NAMES: Record<string, string> = {
   'PRJ-26070002': 'The Spinnaker at Club Laiya',
   'PRJ-26070003': 'TRAT',
@@ -60,17 +66,26 @@ function scopeNameFor(scope: string): string {
 }
 
 // Raw shape of a gr_locations row as returned by Supabase (snake_case).
+// total_linear_meters/total_glass_panels/bracket_system/priority/
+// assigned_team are all nullable at the DB level as of
+// 07_doors_windows_locations.sql — Doors & Windows rows never populate the
+// Railing-specific measurements, and Priority/Assigned Team are commonly
+// blank on freshly-imported registers before crews are dispatched.
 interface GrLocationRow {
   id: string
+  reference: string | null
   project_code: string
   floor_level: string
   unit_no: string
   unit_type: RailingLocation['unitType']
-  total_linear_meters: number
-  total_glass_panels: number
-  bracket_system: RailingLocation['bracketSystem']
-  priority: RailingLocation['priority']
-  assigned_team: RailingLocation['assignedTeam']
+  total_linear_meters: number | null
+  total_glass_panels: number | null
+  bracket_system: string | null
+  window_tag: string | null
+  window_system: string | null
+  tower_building: string | null
+  priority: RailingLocation['priority'] | null
+  assigned_team: RailingLocation['assignedTeam'] | null
   status: LocationStatus
   remarks: string | null
   updated_at: string
@@ -80,16 +95,20 @@ interface GrLocationRow {
 function mapRow(row: GrLocationRow): RailingLocation {
   return {
     id: row.id,
+    reference: row.reference ?? row.id,
     projectCode: row.project_code,
     projectName: projectNameFor(row.project_code),
     floorLevel: row.floor_level,
     unitNo: row.unit_no,
     unitType: row.unit_type,
-    totalLinearMeters: row.total_linear_meters,
-    totalGlassPanels: row.total_glass_panels,
-    bracketSystem: row.bracket_system,
-    priority: row.priority,
-    assignedTeam: row.assigned_team,
+    totalLinearMeters: row.total_linear_meters ?? undefined,
+    totalGlassPanels: row.total_glass_panels ?? undefined,
+    bracketSystem: row.bracket_system ?? undefined,
+    windowTag: row.window_tag ?? undefined,
+    windowSystem: row.window_system ?? undefined,
+    towerBuilding: row.tower_building ?? undefined,
+    priority: row.priority ?? undefined,
+    assignedTeam: row.assigned_team ?? undefined,
     status: row.status,
     remarks: row.remarks ?? '',
     updatedAt: row.updated_at,
@@ -332,8 +351,8 @@ export async function getProjectDashboard(projectCode: string): Promise<ProjectD
     statusCounts,
     locationsWorkedToday: workedToday.length,
     linearMetersInstalledToday:
-      Math.round(workedToday.reduce((sum, l) => sum + l.totalLinearMeters * 0.3, 0) * 10) / 10,
-    panelsInstalledToday: Math.round(workedToday.reduce((sum, l) => sum + l.totalGlassPanels * 0.3, 0)),
+      Math.round(workedToday.reduce((sum, l) => sum + (l.totalLinearMeters ?? 0) * 0.3, 0) * 10) / 10,
+    panelsInstalledToday: Math.round(workedToday.reduce((sum, l) => sum + (l.totalGlassPanels ?? 0) * 0.3, 0)),
     qcPending: statusCounts['QC Inspection'],
     byFloorStatus,
     byScope: groupByScope(locations),
@@ -348,14 +367,17 @@ export async function getOwnerDashboard(projectCode: string): Promise<OwnerDashb
     statusCounts[l.status] += 1
   })
 
-  const totalLinearMeters = round1(locations.reduce((s, l) => s + l.totalLinearMeters, 0))
+  // Doors & Windows locations have no linear-meters/panel-count concept, so
+  // they contribute 0 here rather than being excluded — these totals are
+  // inherently Railing-scope metrics.
+  const totalLinearMeters = round1(locations.reduce((s, l) => s + (l.totalLinearMeters ?? 0), 0))
   const installedLinearMeters = round1(
-    locations.filter((l) => l.status === 'Completed').reduce((s, l) => s + l.totalLinearMeters, 0),
+    locations.filter((l) => l.status === 'Completed').reduce((s, l) => s + (l.totalLinearMeters ?? 0), 0),
   )
-  const totalGlassPanels = locations.reduce((s, l) => s + l.totalGlassPanels, 0)
+  const totalGlassPanels = locations.reduce((s, l) => s + (l.totalGlassPanels ?? 0), 0)
   const installedGlassPanels = locations
     .filter((l) => l.status === 'Completed')
-    .reduce((s, l) => s + l.totalGlassPanels, 0)
+    .reduce((s, l) => s + (l.totalGlassPanels ?? 0), 0)
 
   const groupCount = <T extends string>(getKey: (l: RailingLocation) => T, order?: T[]) => {
     const map = new Map<string, number>()
@@ -377,8 +399,8 @@ export async function getOwnerDashboard(projectCode: string): Promise<OwnerDashb
     installedGlassPanels,
     byFloor: groupCount((l) => l.floorLevel, naturalFloorSort(Array.from(new Set(locations.map((l) => l.floorLevel))))),
     byUnitType: groupCount((l) => l.unitType, Array.from(new Set(locations.map((l) => l.unitType)))),
-    byTeam: groupCount((l) => l.assignedTeam),
-    byBracketSystem: groupCount((l) => l.bracketSystem),
+    byTeam: groupCount((l) => l.assignedTeam ?? 'Unassigned'),
+    byBracketSystem: groupCount((l) => l.bracketSystem ?? 'N/A'),
     byStatus: groupCount((l) => l.status, LOCATION_STATUSES),
     byScope: groupByScope(locations),
   }

@@ -12,7 +12,7 @@ type SortOption = 'priority' | 'id' | 'status' | 'linearMeters'
 
 export default function LocationCardsPage() {
   const navigate = useNavigate()
-  const { selectedProjectCode, selectedFloor, selectedUnitType } = useAppData()
+  const { selectedProjectCode, selectedScope, selectedFloor, selectedUnitType } = useAppData()
   const [locations, setLocations] = useState<RailingLocation[]>([])
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<LocationStatus | 'All'>('All')
@@ -45,12 +45,20 @@ export default function LocationCardsPage() {
       .filter((l) => {
         if (!search.trim()) return true
         const q = search.toLowerCase()
-        return l.id.toLowerCase().includes(q) || l.unitNo.toLowerCase().includes(q)
+        return (
+          l.id.toLowerCase().includes(q) ||
+          (l.reference ?? '').toLowerCase().includes(q) ||
+          l.unitNo.toLowerCase().includes(q)
+        )
       })
       .sort((a, b) => {
-        if (sortBy === 'priority') return priorityRank[a.priority] - priorityRank[b.priority]
+        if (sortBy === 'priority') {
+          const rankA = a.priority ? priorityRank[a.priority] : priorityRank.Low + 1
+          const rankB = b.priority ? priorityRank[b.priority] : priorityRank.Low + 1
+          return rankA - rankB
+        }
         if (sortBy === 'status') return statusRank[a.status] - statusRank[b.status]
-        if (sortBy === 'linearMeters') return b.totalLinearMeters - a.totalLinearMeters
+        if (sortBy === 'linearMeters') return (b.totalLinearMeters ?? 0) - (a.totalLinearMeters ?? 0)
         return a.id.localeCompare(b.id)
       })
   }, [locations, statusFilter, teamFilter, unitTypeFilter, search, sortBy])
@@ -60,7 +68,7 @@ export default function LocationCardsPage() {
   return (
     <div className="min-h-screen bg-[#F5F8FC]">
       <PageHeader
-        title="Railing Locations"
+        title={selectedScope === 'DOORS_WINDOWS' ? 'Doors & Windows Locations' : 'Railing Locations'}
         subtitle={selectedFloor ? `Floor ${selectedFloor}` : 'All floors'}
       />
 

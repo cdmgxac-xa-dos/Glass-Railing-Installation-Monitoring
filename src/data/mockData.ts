@@ -391,8 +391,12 @@ export const MOCK_PUNCH_LIST: PunchListItem[] = MOCK_LOCATIONS.filter((l) => l.s
         ? 'Vertical gap inconsistent between panels 3 and 4.'
         : 'Sealant bead uneven along base track.',
     category: PUNCH_CATEGORIES[i % PUNCH_CATEGORIES.length],
-    priority: l.priority,
-    assignedTeam: l.assignedTeam,
+    // Every mock location currently has these set, so these fallbacks are
+    // unreachable today — only here because RailingLocation's fields are
+    // now optional (real registers can be imported before crews are
+    // assigned) and PunchListItem's aren't.
+    priority: l.priority ?? 'Medium',
+    assignedTeam: l.assignedTeam ?? 'Team A',
     status: i % 3 === 0 ? 'In Rectification' : i % 3 === 1 ? 'Assigned' : 'Open',
     dateFound: new Date(Date.now() - (i + 2) * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
     targetCompletionDate: new Date(Date.now() + (3 - i) * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),

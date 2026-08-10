@@ -3,12 +3,14 @@ import { useParams } from 'react-router-dom'
 import type { ChecklistStageDef, ChecklistState } from '../types'
 import { getChecklist, getChecklistStagesForLocation, updateChecklistStage } from '../services/checklistService'
 import { useAuth } from '../context/AuthContext'
+import { useLocationReference } from '../hooks/useLocationReference'
 import PageHeader from '../components/PageHeader'
 import ChecklistItem from '../components/ChecklistItem'
 
 export default function InstallationChecklistPage() {
   const { locationId = '' } = useParams()
   const { user } = useAuth()
+  const reference = useLocationReference(locationId)
   const [stages, setStages] = useState<ChecklistStageDef[]>([])
   const [checklist, setChecklist] = useState<ChecklistState | null>(null)
 
@@ -43,7 +45,7 @@ export default function InstallationChecklistPage() {
 
   return (
     <div className="min-h-screen bg-[#F5F8FC]">
-      <PageHeader title="Installation Checklist" subtitle={locationId} />
+      <PageHeader title="Installation Checklist" subtitle={reference} />
 
       <div className="px-4 pt-4">
         <div className="rounded-2xl border border-xa-line bg-white p-4 shadow-card">

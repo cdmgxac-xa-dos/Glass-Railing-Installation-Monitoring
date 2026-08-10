@@ -6,12 +6,14 @@ import { PRIORITIES } from '../types'
 import { getQcItemsForLocation, submitQCInspection } from '../services/qcService'
 import { addPhoto } from '../services/photoService'
 import { useAuth } from '../context/AuthContext'
+import { useLocationReference } from '../hooks/useLocationReference'
 import PageHeader from '../components/PageHeader'
 
 export default function QCInspectionPage() {
   const { locationId = '' } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
+  const reference = useLocationReference(locationId)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [items, setItems] = useState<QCChecklistItemDef[]>([])
@@ -85,7 +87,7 @@ export default function QCInspectionPage() {
   if (submitted) {
     return (
       <div className="min-h-screen bg-[#F5F8FC]">
-        <PageHeader title="QC Inspection" subtitle={locationId} />
+        <PageHeader title="QC Inspection" subtitle={reference} />
         <div className="flex flex-col items-center gap-4 px-6 py-16 text-center">
           <div
             className={`flex h-16 w-16 items-center justify-center rounded-full ${
@@ -113,7 +115,7 @@ export default function QCInspectionPage() {
 
   return (
     <div className="min-h-screen bg-[#F5F8FC] pb-8">
-      <PageHeader title="QC Inspection" subtitle={locationId} />
+      <PageHeader title="QC Inspection" subtitle={reference} />
 
       <div className="space-y-5 px-4 py-5">
         <div className="rounded-2xl border border-xa-line bg-white p-4 shadow-card">

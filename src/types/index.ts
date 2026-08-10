@@ -51,17 +51,24 @@ export type Priority = 'High' | 'Medium' | 'Low'
 
 export const PRIORITIES: Priority[] = ['High', 'Medium', 'Low']
 
+// Known values, used to seed dropdowns/filters — not an exhaustive type.
+// The database has no constraint on this column (matches UnitType below):
+// real registers keep introducing new material specs (e.g. 'U-Channel'),
+// and RailingLocation.bracketSystem below is typed as plain `string` so a
+// value this list doesn't yet know about still loads and displays fine.
 export type BracketSystem =
   | 'Bracket System A'
   | 'Bracket System B'
   | 'Bracket System C'
   | 'CKB-4735'
+  | 'U-Channel'
 
 export const BRACKET_SYSTEMS: BracketSystem[] = [
   'Bracket System A',
   'Bracket System B',
   'Bracket System C',
   'CKB-4735',
+  'U-Channel',
 ]
 
 export type AssignedTeam = 'Team A' | 'Team B' | 'Team C' | 'Team D'
@@ -105,19 +112,44 @@ export interface Project {
   totalLocations: number
 }
 
-// One monitoring record = one complete glass railing location / run.
+// One monitoring record = one installation location/run, for any scope
+// (Railings, Doors & Windows, ...) — despite the name, not Railing-only.
 export interface RailingLocation {
-  id: string // e.g. GR-021
+  // Database primary key. Globally unique across every project, so for
+  // scopes whose own register numbers locations per-project (e.g. Doors &
+  // Windows registers that each restart at 'AGD-001') this is prefixed by
+  // project (e.g. 'SPN-AGD-001') to stay unique — the original register
+  // label lives in `reference` below for display. Railing locations don't
+  // need a prefix (their own IDs, e.g. 'GR-021', are already globally
+  // unique), so `id` and `reference` are the same value there.
+  id: string // e.g. GR-021, SPN-AGD-001
+  // The human-facing label from the source register (e.g. 'GR-021',
+  // 'AGD-001') — what's printed on physical location tags on site and
+  // what field crews should see on screen. Optional only because mock
+  // data predates this field; falls back to `id` wherever displayed.
+  reference?: string
   projectCode: string // e.g. PR-001
   projectName: string
   floorLevel: string // e.g. "12F", "GF", "Roof Deck"
   unitNo: string // e.g. "Unit 1201"
   unitType: UnitType
-  totalLinearMeters: number
-  totalGlassPanels: number
-  bracketSystem: BracketSystem
-  priority: Priority
-  assignedTeam: AssignedTeam
+  // Railing-specific measurements. Optional because Doors & Windows
+  // locations don't have them — a window has no "linear meters of
+  // railing" or "glass panel count" in this sense.
+  totalLinearMeters?: number
+  totalGlassPanels?: number
+  // Free text (see BracketSystem note above) — Railing-specific; absent
+  // for Doors & Windows locations.
+  bracketSystem?: string
+  // Doors & Windows-specific fields — absent for Railing locations.
+  windowTag?: string
+  windowSystem?: string
+  towerBuilding?: string
+  // Optional because real registers are frequently imported before crews
+  // are assigned — a location can genuinely have no priority/team yet.
+  // UI should show "Unassigned" rather than treat this as missing data.
+  priority?: Priority
+  assignedTeam?: AssignedTeam
   status: LocationStatus
   remarks: string
   updatedAt: string // ISO datetime

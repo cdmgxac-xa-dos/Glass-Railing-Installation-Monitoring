@@ -46,7 +46,7 @@ export default function UpdateStatusPage() {
 
   return (
     <div className="min-h-screen bg-[#F5F8FC]">
-      <PageHeader title="Update Status" subtitle={locationId} />
+      <PageHeader title="Update Status" subtitle={location.reference ?? locationId} />
       <div className="space-y-3 px-4 py-5">
         <p className="text-xs font-bold uppercase tracking-wide text-xa-slate">Current status</p>
         <StatusBadge value={location.status} />

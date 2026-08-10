@@ -212,8 +212,8 @@ export async function buildReportPdf(
   }
 
   if (config.includeByUnitType) cursorY = groupedBreakdownTable(doc, cursorY, header, didDrawPage, 'Breakdown by Unit Type', locations, (l) => l.unitType)
-  if (config.includeByBracketSystem) cursorY = groupedBreakdownTable(doc, cursorY, header, didDrawPage, 'Breakdown by Bracket System', locations, (l) => l.bracketSystem)
-  if (config.includeByTeam) cursorY = groupedBreakdownTable(doc, cursorY, header, didDrawPage, 'Breakdown by Assigned Team', locations, (l) => l.assignedTeam)
+  if (config.includeByBracketSystem) cursorY = groupedBreakdownTable(doc, cursorY, header, didDrawPage, 'Breakdown by Bracket System', locations, (l) => l.bracketSystem ?? 'N/A')
+  if (config.includeByTeam) cursorY = groupedBreakdownTable(doc, cursorY, header, didDrawPage, 'Breakdown by Assigned Team', locations, (l) => l.assignedTeam ?? 'Unassigned')
 
   // Shared fetches: QC + punch-list data feeds both the per-location history
   // (inside Full Detail) and the standalone Punch List Detail table, so
@@ -229,11 +229,16 @@ export async function buildReportPdf(
   // four from that one array avoids redundant network round-trips when
   // both sections are checked.
   const needsPhotos = config.includeFullDetailPhotos || config.includeByPunchList
+  // Keyed by `reference` (the label actually rendered in every "Tag ID"
+  // column below), not `id` — both didDrawCell handlers read the Tag ID
+  // back off the rendered row rather than trusting row-index alignment,
+  // so the lookup key here has to match what's on the page, not the DB
+  // primary key. Identical for Railing locations (reference === id there).
   const photosByLocation = new Map<string, LocationPhotoDataUrls>()
   if (needsPhotos) {
     await Promise.all(
       locations.map(async (l) => {
-        photosByLocation.set(l.id, await getPhotoDataUrlsForLocation(l.id))
+        photosByLocation.set(l.reference ?? l.id, await getPhotoDataUrlsForLocation(l.id))
       }),
     )
   }
@@ -277,7 +282,7 @@ export async function buildReportPdf(
             : ''
           return [
             loc?.floorLevel ?? '',
-            item.locationId,
+            loc?.reference ?? item.locationId,
             loc?.unitNo ?? '',
             item.status,
             failedItemLabels || '—',
@@ -369,7 +374,7 @@ export async function buildReportPdf(
       startY: cursorY,
       head: [detailHead],
       body: locations.map((l) => {
-        const row = [l.id, l.floorLevel, l.unitNo, l.status]
+        const row = [l.reference ?? l.id, l.floorLevel, l.unitNo, l.status]
         if (config.includeFullDetailPhotos) row.push('', '', '') // drawn via didDrawCell below
         return row
       }),
@@ -414,7 +419,7 @@ export async function buildReportPdf(
         cursorY = ensureSpace(doc, cursorY, header)
         doc.setFontSize(10)
         doc.setFont('helvetica', 'bold')
-        doc.text(`${loc.id} — QC & Punch List History`, 40, cursorY)
+        doc.text(`${loc.reference ?? loc.id} — QC & Punch List History`, 40, cursorY)
         cursorY += 12
 
         if (locQc.length > 0) {

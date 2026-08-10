@@ -3,8 +3,10 @@ import { useNavigate, useParams } from 'react-router-dom'
 import type { PunchListItem, PunchListStatus } from '../types'
 import { PUNCH_LIST_STATUSES } from '../types'
 import { getPunchListForLocation, getPunchListForProject, updatePunchListStatus } from '../services/punchListService'
+import { getLocationsByProject } from '../services/locationService'
 import { useAppData } from '../context/DataContext'
 import { useAuth } from '../context/AuthContext'
+import { useLocationReference } from '../hooks/useLocationReference'
 import PageHeader from '../components/PageHeader'
 import PunchListCard from '../components/PunchListCard'
 import StatusBadge from '../components/StatusBadge'
@@ -14,14 +16,21 @@ export default function PunchListPage() {
   const navigate = useNavigate()
   const { selectedProjectCode } = useAppData()
   const { user } = useAuth()
+  const reference = useLocationReference(locationId ?? '')
   const [items, setItems] = useState<PunchListItem[]>([])
   const [expanded, setExpanded] = useState<string | null>(null)
+  // locationId -> reference, only needed for the all-locations view where
+  // each card shows which location it belongs to.
+  const [referenceByLocation, setReferenceByLocation] = useState<Record<string, string>>({})
 
   useEffect(() => {
     if (locationId) {
       getPunchListForLocation(locationId).then(setItems)
     } else if (selectedProjectCode) {
       getPunchListForProject(selectedProjectCode).then(setItems)
+      getLocationsByProject(selectedProjectCode).then((locations) => {
+        setReferenceByLocation(Object.fromEntries(locations.map((l) => [l.id, l.reference ?? l.id])))
+      })
     } else {
       navigate('/projects')
     }
@@ -34,7 +43,7 @@ export default function PunchListPage() {
 
   return (
     <div className="min-h-screen bg-[#F5F8FC]">
-      <PageHeader title="Punch List" subtitle={locationId ?? 'All open items'} />
+      <PageHeader title="Punch List" subtitle={locationId ? reference : 'All open items'} />
 
       <div className="space-y-3 px-4 py-5">
         {items.length === 0 && (
@@ -44,7 +53,7 @@ export default function PunchListPage() {
           <div key={item.id}>
             <PunchListCard
               item={item}
-              locationLabel={locationId ? undefined : item.locationId}
+              locationLabel={locationId ? undefined : (referenceByLocation[item.locationId] ?? item.locationId)}
               onClick={() => setExpanded((cur) => (cur === item.id ? null : item.id))}
             />
             {expanded === item.id && (

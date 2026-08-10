@@ -4,12 +4,14 @@ import type { LocationPhoto, PhotoCategory } from '../types'
 import { PHOTO_CATEGORIES } from '../types'
 import { addPhoto, getPhotosForLocation, removePhoto } from '../services/photoService'
 import { useAuth } from '../context/AuthContext'
+import { useLocationReference } from '../hooks/useLocationReference'
 import PageHeader from '../components/PageHeader'
 import PhotoSection from '../components/PhotoSection'
 
 export default function PhotosPage() {
   const { locationId = '' } = useParams()
   const { user } = useAuth()
+  const reference = useLocationReference(locationId)
   const [photos, setPhotos] = useState<LocationPhoto[]>([])
 
   useEffect(() => {
@@ -29,7 +31,7 @@ export default function PhotosPage() {
 
   return (
     <div className="min-h-screen bg-[#F5F8FC]">
-      <PageHeader title="Photos" subtitle={locationId} />
+      <PageHeader title="Photos" subtitle={reference} />
       <div className="space-y-4 px-4 py-5">
         <p className="text-xs text-xa-slate">
           Photos are stored on this device for now. Once connected to Supabase Storage, they'll upload
