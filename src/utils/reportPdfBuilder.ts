@@ -9,12 +9,12 @@ import type {
   RailingLocation,
   ReportConfig,
 } from '../types'
-import { QC_CHECKLIST_ITEMS } from '../types'
 import { getLocationsByProject, getProjectDashboard } from '../services/locationService'
 import { getQCRecordsForProject } from '../services/qcService'
 import { getPunchListForProject } from '../services/punchListService'
 import { getPhotosForLocation } from '../services/photoService'
 import { getFloorPlan, getPinsForFloorPlan } from '../services/floorPlanService'
+import { getQcItemsForScope } from '../services/templateService'
 import { STATUS_COLORS, STATUS_ORDER } from '../constants/statusColors'
 
 // Graphite gray — brand hex for the header banner and every table header row.
@@ -113,6 +113,15 @@ export async function buildReportPdf(
 ): Promise<{ blob: Blob; title: string }> {
   const locations = await getLocationsByProject(projectCode)
   const summary = await getProjectDashboard(projectCode)
+
+  // QC item label list per scope actually present on this project — one
+  // lookup per distinct scope, not per record, so a mixed Railings +
+  // Doors & Windows project resolves failed-item labels correctly for
+  // both instead of only ever matching the Railing list.
+  const scopesInUse = Array.from(new Set(locations.map((l) => l.scope ?? 'RAILING')))
+  const qcItemsByScope = new Map(
+    await Promise.all(scopesInUse.map(async (scope) => [scope, await getQcItemsForScope(scope)] as const)),
+  )
   const generatedDate = new Date()
   const title = `${summary.projectName.replace(/\s+/g, '_')}_Report_${generatedDate.toISOString().slice(0, 10)}`
 
@@ -259,14 +268,10 @@ export async function buildReportPdf(
         body: punchItems.map((item) => {
           const loc = locations.find((l) => l.id === item.locationId)
           const failedQc = latestFailedQcByLocation.get(item.locationId)
-          // Labels QC_CHECKLIST_ITEMS is the Railing scope's QC item list
-          // only (see src/types/index.ts) — a Doors & Windows QC failure's
-          // itemResults keys won't match it, so this silently renders no
-          // failed-item labels for that scope. Reports aren't scope-aware
-          // yet (that's Phase 4 of the Field Installation Monitoring
-          // expansion); harmless today since every project is Railings-only.
+          const scopeQcItems = qcItemsByScope.get(loc?.scope ?? 'RAILING') ?? []
           const failedItemLabels = failedQc
-            ? QC_CHECKLIST_ITEMS.filter((d) => failedQc.itemResults[d.key] === false)
+            ? scopeQcItems
+                .filter((d) => failedQc.itemResults[d.key] === false)
                 .map((d) => d.label)
                 .join(', ')
             : ''

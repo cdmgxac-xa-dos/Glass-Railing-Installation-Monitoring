@@ -1,11 +1,13 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient'
 import { MOCK_LOCATIONS } from '../data/mockData'
 import type {
+  FloorScopeBreakdown,
   FloorSummary,
   LocationStatus,
   OwnerDashboardSummary,
   ProjectDashboardSummary,
   RailingLocation,
+  ScopeProgress,
   StatusCounts,
   UnitType,
   UnitTypeSummary,
@@ -42,6 +44,19 @@ const PROJECT_NAMES: Record<string, string> = {
 
 function projectNameFor(projectCode: string): string {
   return PROJECT_NAMES[projectCode] ?? projectCode
+}
+
+// Mirrors installation_scopes' name column (see supabase/05_scope_foundation.sql)
+// rather than querying it — kept local and hardcoded like PROJECT_NAMES
+// above to avoid a locationService -> scopeService import cycle
+// (scopeService already imports getLocationsByProject from this file).
+const SCOPE_NAMES: Record<string, string> = {
+  RAILING: 'Glass Railings',
+  DOORS_WINDOWS: 'Doors & Windows',
+}
+
+function scopeNameFor(scope: string): string {
+  return SCOPE_NAMES[scope] ?? scope
 }
 
 // Raw shape of a gr_locations row as returned by Supabase (snake_case).
@@ -119,6 +134,60 @@ function emptyStatusCounts(): Record<LocationStatus, number> {
     'On Hold': 0,
     Completed: 0,
   }
+}
+
+// Progress rolled up per installation scope — see ScopeProgress in
+// src/types/index.ts. Locations with no scope (mock data, predating the
+// scope column) count as 'RAILING', matching every real row's default.
+function groupByScope(locations: RailingLocation[]): ScopeProgress[] {
+  const counts = new Map<string, { total: number; completed: number }>()
+  locations.forEach((l) => {
+    const scope = l.scope ?? 'RAILING'
+    const entry = counts.get(scope) ?? { total: 0, completed: 0 }
+    entry.total += 1
+    if (l.status === 'Completed') entry.completed += 1
+    counts.set(scope, entry)
+  })
+  return Array.from(counts.entries()).map(([scope, { total, completed }]) => ({
+    scope,
+    scopeName: scopeNameFor(scope),
+    totalLocations: total,
+    completedLocations: completed,
+    progressPct: total ? Math.round((completed / total) * 100) : 0,
+  }))
+}
+
+// Same idea, split further by floor — feeds the "Floor 19: Doors & Windows
+// 80%, Railings 90%" style breakdown from the expansion plan's Section 14.
+// Nested by floor then scope (rather than a joined string key) since floor
+// labels themselves contain spaces (e.g. "7th Floor"), which would make a
+// space-delimited key ambiguous to split back apart.
+function groupByFloorScope(locations: RailingLocation[]): FloorScopeBreakdown[] {
+  const byFloor = new Map<string, Map<string, { total: number; completed: number }>>()
+  locations.forEach((l) => {
+    const scope = l.scope ?? 'RAILING'
+    const scopeCounts = byFloor.get(l.floorLevel) ?? new Map<string, { total: number; completed: number }>()
+    const entry = scopeCounts.get(scope) ?? { total: 0, completed: 0 }
+    entry.total += 1
+    if (l.status === 'Completed') entry.completed += 1
+    scopeCounts.set(scope, entry)
+    byFloor.set(l.floorLevel, scopeCounts)
+  })
+
+  const floors = naturalFloorSort(Array.from(new Set(locations.map((l) => l.floorLevel))))
+  const result: FloorScopeBreakdown[] = []
+  floors.forEach((floorLevel) => {
+    byFloor.get(floorLevel)?.forEach(({ total, completed }, scope) => {
+      result.push({
+        floorLevel,
+        scope,
+        scopeName: scopeNameFor(scope),
+        locationCount: total,
+        progressPct: total ? Math.round((completed / total) * 100) : 0,
+      })
+    })
+  })
+  return result
 }
 
 export async function getLocationsByProject(projectCode: string): Promise<RailingLocation[]> {
@@ -267,6 +336,8 @@ export async function getProjectDashboard(projectCode: string): Promise<ProjectD
     panelsInstalledToday: Math.round(workedToday.reduce((sum, l) => sum + l.totalGlassPanels * 0.3, 0)),
     qcPending: statusCounts['QC Inspection'],
     byFloorStatus,
+    byScope: groupByScope(locations),
+    byFloorScope: groupByFloorScope(locations),
   }
 }
 
@@ -309,6 +380,7 @@ export async function getOwnerDashboard(projectCode: string): Promise<OwnerDashb
     byTeam: groupCount((l) => l.assignedTeam),
     byBracketSystem: groupCount((l) => l.bracketSystem),
     byStatus: groupCount((l) => l.status, LOCATION_STATUSES),
+    byScope: groupByScope(locations),
   }
 }
 

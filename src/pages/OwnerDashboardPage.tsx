@@ -86,6 +86,30 @@ export default function OwnerDashboardPage() {
           />
         </div>
 
+        {/* Only renders once a project has more than one installation
+            scope's worth of data — every project today is Railings-only. */}
+        {summary.byScope.length > 1 && (
+          <section>
+            <p className="mb-2 text-xs font-bold uppercase tracking-wide text-xa-slate">By scope</p>
+            <div className="space-y-3">
+              {summary.byScope.map((s) => (
+                <div key={s.scope} className="rounded-2xl border border-xa-line bg-white p-4 shadow-card">
+                  <div className="flex items-center justify-between text-sm">
+                    <p className="font-semibold text-xa-navy">{s.scopeName}</p>
+                    <p className="font-extrabold text-xa-navy">{s.progressPct}%</p>
+                  </div>
+                  <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                    <div className="h-full rounded-full bg-xa-blue" style={{ width: `${s.progressPct}%` }} />
+                  </div>
+                  <p className="mt-1.5 text-xs text-xa-slate">
+                    {s.completedLocations}/{s.totalLocations} locations completed
+                  </p>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
         <section>
           <p className="mb-2 text-xs font-bold uppercase tracking-wide text-xa-slate">By status</p>
           <div className="rounded-2xl border border-xa-line bg-white p-3 shadow-card">

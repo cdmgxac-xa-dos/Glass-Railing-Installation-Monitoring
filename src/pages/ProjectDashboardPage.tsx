@@ -76,6 +76,32 @@ export default function ProjectDashboardPage() {
           </div>
         </div>
 
+        {/* Only renders once a project actually has more than one
+            installation scope's worth of data — every project today is
+            Railings-only, so this stays invisible until Doors & Windows
+            locations are actually loaded somewhere. */}
+        {summary.byScope.length > 1 && (
+          <div>
+            <p className="mb-2 text-xs font-bold uppercase tracking-wide text-xa-slate">By scope</p>
+            <div className="space-y-3">
+              {summary.byScope.map((s) => (
+                <div key={s.scope} className="rounded-2xl border border-xa-line bg-white p-4 shadow-card">
+                  <div className="flex items-center justify-between text-sm">
+                    <p className="font-semibold text-xa-navy">{s.scopeName}</p>
+                    <p className="font-extrabold text-xa-navy">{s.progressPct}%</p>
+                  </div>
+                  <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                    <div className="h-full rounded-full bg-xa-blue transition-all" style={{ width: `${s.progressPct}%` }} />
+                  </div>
+                  <p className="mt-1.5 text-xs text-xa-slate">
+                    {s.completedLocations}/{s.totalLocations} locations completed
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div>
           <p className="mb-2 text-xs font-bold uppercase tracking-wide text-xa-slate">Accomplishment by floor</p>
           <div className="space-y-3">
@@ -89,6 +115,28 @@ export default function ProjectDashboardPage() {
             ))}
           </div>
         </div>
+
+        {summary.byScope.length > 1 && (
+          <div>
+            <p className="mb-2 text-xs font-bold uppercase tracking-wide text-xa-slate">By floor &amp; scope</p>
+            <div className="space-y-2">
+              {Array.from(new Set(summary.byFloorScope.map((f) => f.floorLevel))).map((floorLevel) => (
+                <div key={floorLevel} className="rounded-2xl border border-xa-line bg-white p-3 shadow-card">
+                  <p className="mb-1.5 text-sm font-bold text-xa-navy">{floorLevel}</p>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1">
+                    {summary.byFloorScope
+                      .filter((f) => f.floorLevel === floorLevel)
+                      .map((f) => (
+                        <p key={f.scope} className="text-xs text-xa-slate">
+                          <span className="font-semibold text-xa-navy">{f.scopeName}</span> {f.progressPct}%
+                        </p>
+                      ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div>
           <p className="mb-2 text-xs font-bold uppercase tracking-wide text-xa-slate">Today</p>

@@ -373,6 +373,27 @@ export interface FloorStatusBreakdown {
   locationCount: number
 }
 
+// Progress rolled up per installation scope (Railings, Doors & Windows,
+// ...) — see the Field Installation Monitoring expansion plan, Section 14.
+// Every project today has locations in exactly one scope, so this always
+// resolves to a single-entry array; pages only render a "by scope" section
+// once there's more than one entry to actually compare.
+export interface ScopeProgress {
+  scope: string
+  scopeName: string
+  totalLocations: number
+  completedLocations: number
+  progressPct: number
+}
+
+export interface FloorScopeBreakdown {
+  floorLevel: string
+  scope: string
+  scopeName: string
+  locationCount: number
+  progressPct: number
+}
+
 export interface ProjectDashboardSummary {
   projectName: string
   overallProgressPct: number
@@ -382,6 +403,8 @@ export interface ProjectDashboardSummary {
   panelsInstalledToday: number
   qcPending: number
   byFloorStatus: FloorStatusBreakdown[]
+  byScope: ScopeProgress[]
+  byFloorScope: FloorScopeBreakdown[]
 }
 
 export interface OwnerDashboardSummary {
@@ -397,6 +420,7 @@ export interface OwnerDashboardSummary {
   byTeam: { label: string; count: number }[]
   byBracketSystem: { label: string; count: number }[]
   byStatus: { label: string; count: number }[]
+  byScope: ScopeProgress[]
 }
 
 export interface ReportConfig {
