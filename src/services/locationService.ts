@@ -211,15 +211,13 @@ function groupByFloorScope(locations: RailingLocation[]): FloorScopeBreakdown[] 
   return result
 }
 
-export async function getLocationsByProject(projectCode: string): Promise<RailingLocation[]> {
+export async function getLocationsByProject(projectCode: string, scope?: string): Promise<RailingLocation[]> {
   if (!isSupabaseConfigured) {
-    return mockStore.filter((l) => l.projectCode === projectCode)
+    return mockStore.filter((l) => l.projectCode === projectCode && (!scope || l.scope === scope))
   }
-  const { data, error } = await supabase!
-    .from('gr_locations')
-    .select('*')
-    .eq('project_code', projectCode)
-    .order('id')
+  let query = supabase!.from('gr_locations').select('*').eq('project_code', projectCode)
+  if (scope) query = query.eq('scope', scope)
+  const { data, error } = await query.order('id')
 
   if (error) throw error
   return (data as GrLocationRow[]).map(mapRow)
@@ -287,6 +285,7 @@ export async function getUnitTypesForFloor(projectCode: string, floorLevel: stri
 
 export async function getLocations(filters: {
   projectCode: string
+  scope?: string
   floorLevel?: string
   unitType?: UnitType
 }): Promise<RailingLocation[]> {
@@ -294,12 +293,14 @@ export async function getLocations(filters: {
     return mockStore.filter(
       (l) =>
         l.projectCode === filters.projectCode &&
+        (!filters.scope || l.scope === filters.scope) &&
         (!filters.floorLevel || l.floorLevel === filters.floorLevel) &&
         (!filters.unitType || l.unitType === filters.unitType),
     )
   }
 
   let query = supabase!.from('gr_locations').select('*').eq('project_code', filters.projectCode)
+  if (filters.scope) query = query.eq('scope', filters.scope)
   if (filters.floorLevel) query = query.eq('floor_level', filters.floorLevel)
   if (filters.unitType) query = query.eq('unit_type', filters.unitType)
 
@@ -318,8 +319,8 @@ export async function getUnitTypesInUse(projectCode: string): Promise<UnitType[]
   return Array.from(new Set(locations.map((l) => l.unitType))).sort()
 }
 
-export async function getProjectDashboard(projectCode: string): Promise<ProjectDashboardSummary> {
-  const locations = await getLocationsByProject(projectCode)
+export async function getProjectDashboard(projectCode: string, scope?: string): Promise<ProjectDashboardSummary> {
+  const locations = await getLocationsByProject(projectCode, scope)
   const statusCounts = emptyStatusCounts()
   locations.forEach((l) => {
     statusCounts[l.status] += 1

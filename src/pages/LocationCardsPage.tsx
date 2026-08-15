@@ -29,10 +29,11 @@ export default function LocationCardsPage() {
     }
     getLocations({
       projectCode: selectedProjectCode,
+      scope: selectedScope ?? undefined,
       floorLevel: selectedFloor ?? undefined,
     }).then(setLocations)
     getUnitTypesInUse(selectedProjectCode).then(setUnitTypesInUse)
-  }, [selectedProjectCode, selectedFloor, navigate])
+  }, [selectedProjectCode, selectedScope, selectedFloor, navigate])
 
   const filtered = useMemo(() => {
     const priorityRank = { High: 0, Medium: 1, Low: 2 }
