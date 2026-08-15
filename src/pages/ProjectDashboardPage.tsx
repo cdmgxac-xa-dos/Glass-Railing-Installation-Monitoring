@@ -10,7 +10,7 @@ import FloorStatusDoughnut from '../components/FloorStatusDoughnut'
 
 export default function ProjectDashboardPage() {
   const navigate = useNavigate()
-  const { selectedProjectCode } = useAppData()
+  const { selectedProjectCode, selectedScope } = useAppData()
   const [summary, setSummary] = useState<ProjectDashboardSummary | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
@@ -22,13 +22,13 @@ export default function ProjectDashboardPage() {
     }
     setSummary(null)
     setError(null)
-    getProjectDashboard(selectedProjectCode)
+    getProjectDashboard(selectedProjectCode, selectedScope ?? undefined)
       .then(setSummary)
       .catch((err: unknown) => {
         console.error('Failed to load project dashboard:', err)
         setError(err instanceof Error ? err.message : 'Failed to load dashboard.')
       })
-  }, [selectedProjectCode, navigate, reloadKey])
+  }, [selectedProjectCode, selectedScope, navigate, reloadKey])
 
   if (error) {
     return (
