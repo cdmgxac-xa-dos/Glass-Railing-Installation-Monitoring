@@ -62,7 +62,7 @@ function computeIsDesktopStyle(): boolean {
 export default function FloorPlanPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { selectedProjectCode, selectedFloor } = useAppData()
+  const { selectedProjectCode, selectedScope, selectedFloor } = useAppData()
 
   const canManagePins = user?.roleCode ? PIN_MANAGER_ROLE_CODES.includes(user.roleCode) : false
 
@@ -196,19 +196,19 @@ export default function FloorPlanPage() {
     // fresh, never cached.
     Promise.all([
       getFloorPlanCached(selectedProjectCode, selectedFloor),
-      getLocationsByProject(selectedProjectCode),
+      getLocationsByProject(selectedProjectCode, selectedScope ?? undefined),
     ])
-      .then(([entry, allLocations]) => {
+      .then(([entry, scopedLocations]) => {
         setFloorPlan(entry?.floorPlan ?? null)
         setPins(entry?.pins ?? [])
-        setLocations(allLocations.filter((l) => l.floorLevel === selectedFloor))
+        setLocations(scopedLocations.filter((l) => l.floorLevel === selectedFloor))
       })
       .catch((err: unknown) => {
         console.error('Failed to load floor plan:', err)
         setError(err instanceof Error ? err.message : 'Failed to load floor plan.')
       })
       .finally(() => setLoading(false))
-  }, [selectedProjectCode, selectedFloor])
+  }, [selectedProjectCode, selectedScope, selectedFloor])
 
   // Shared by the click-to-browse file input and desktop drag-and-drop —
   // both end up with a File and go through the identical upload path
@@ -395,8 +395,15 @@ export default function FloorPlanPage() {
     }
   }
 
-  const pinnedLocationIds = useMemo(() => new Set(pins.map((p) => p.locationId)), [pins])
   const locationById = useMemo(() => new Map(locations.map((l) => [l.id, l])), [locations])
+  // pins holds every pin on this floor plan regardless of scope (Railing and
+  // Doors & Windows share one physical floor plan image/pin set in storage —
+  // see floorPlanService.ts). `locations` is already scope-filtered, so
+  // cross-referencing against locationById here is what keeps a worker in
+  // one scope from ever seeing, dragging, or deleting a pin that belongs to
+  // the other scope's locations.
+  const visiblePins = useMemo(() => pins.filter((p) => locationById.has(p.locationId)), [pins, locationById])
+  const pinnedLocationIds = useMemo(() => new Set(visiblePins.map((p) => p.locationId)), [visiblePins])
 
   const pickerResults = useMemo(() => {
     const unpinned = locations.filter((l) => !pinnedLocationIds.has(l.id))
@@ -445,7 +452,7 @@ export default function FloorPlanPage() {
             Drop to replace this floor plan
           </div>
         )}
-        {pins.map((pin) => {
+        {visiblePins.map((pin) => {
           const loc = locationById.get(pin.locationId)
           const color = loc ? STATUS_COLORS[loc.status] : '#8A99A8'
           const canDrag = editMode && canManagePins
