@@ -37,6 +37,29 @@ multi-scope expansion, PDF reports, floor-plan pins, and PWA install
 support were all added since, and none of it is reflected in the README.
 Trust this file and the code over it.
 
+**Known bug: mock mode is currently broken past Floor/Unit Type
+selection.** `locationService.ts`'s mock-mode branches of
+`getLocations()` and `getLocationsByProject()` filter by
+`l.scope === filters.scope` with no fallback for an unset `l.scope`. Every
+row in `src/data/mockData.ts` predates the scope column (`scope` is
+`undefined` on all of them), but `scopeService.ts`/`ScopeSelectionPage`
+now always resolve a real scope code (`'RAILING'`) and pass it down as an
+active filter — so in mock mode, Location Cards, the Project Dashboard,
+and the Owner Dashboard's per-project figures all silently return zero
+rows / 0%, even though the floor/unit-type selection screens (which use
+different, unaffected queries) still show correct non-zero counts. This
+is a real regression, not a design choice: `groupByScope()` a few dozen
+lines below in the same file already implements the correct fallback
+(`const scope = l.scope ?? 'RAILING'`, with a comment explaining exactly
+why), and `RailingLocation.scope`'s own doc comment in `types/index.ts`
+says the same thing should hold everywhere. The two-line fix is adding
+that same `|| !l.scope` fallback to both filters. Not yet fixed as of
+this writing — confirmed by reproducing it locally (dev mode, no
+`.env.local`) while capturing UI screenshots for a design review; a
+one-line local workaround was used to get past it for that pass but was
+never committed. Real mode is not known to be affected (real
+`gr_locations` rows always have `scope` set by the load migrations).
+
 ## Architecture: dual-mode services
 
 Every service in `src/services/` follows the same pattern: check
