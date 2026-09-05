@@ -4,6 +4,7 @@ import ProtectedRoute from './routes/ProtectedRoute'
 
 import SplashPage from './pages/SplashPage'
 import LoginPage from './pages/LoginPage'
+import ResetPasswordPage from './pages/ResetPasswordPage'
 import ChangePasswordPage from './pages/ChangePasswordPage'
 import ProjectSelectionPage from './pages/ProjectSelectionPage'
 import ScopeSelectionPage from './pages/ScopeSelectionPage'
@@ -32,6 +33,7 @@ export default function App() {
       {/* Public */}
       <Route path="/" element={<SplashPage />} />
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
 
       {/* Forced password change is full-screen, outside the bottom-nav shell */}
       <Route

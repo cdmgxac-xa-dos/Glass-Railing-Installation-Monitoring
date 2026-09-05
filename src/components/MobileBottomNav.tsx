@@ -1,11 +1,11 @@
-import { Home, Layers, ListChecks, LayoutDashboard, MoreHorizontal } from 'lucide-react'
+import { Home, Layers, ListChecks, Activity, MoreHorizontal } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 
 const NAV_ITEMS = [
   { to: '/project', label: 'Home', icon: Home, end: true },
   { to: '/floors', label: 'Floors', icon: Layers },
   { to: '/locations', label: 'Tasks', icon: ListChecks },
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/dashboard', label: 'Activity', icon: Activity },
   { to: '/more', label: 'More', icon: MoreHorizontal },
 ]
 

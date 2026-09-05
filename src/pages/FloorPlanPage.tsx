@@ -108,6 +108,10 @@ export default function FloorPlanPage() {
   // `pins` state on pointerup — avoids any dependence on React having
   // flushed the in-progress drag's setPins before the save runs.
   const dragLatestPosRef = useRef<{ xPct: number; yPct: number } | null>(null)
+  // The pin's position at drag start, captured before any optimistic
+  // setPins() during the drag overwrites it — needed so the pin audit log
+  // records the true "before" position, not an already-moved one.
+  const dragStartPosRef = useRef<{ xPct: number; yPct: number } | null>(null)
   const mobileViewportRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -298,6 +302,8 @@ export default function FloorPlanPage() {
     e.stopPropagation()
     dragPinIdRef.current = pinId
     dragLatestPosRef.current = null
+    const startPin = pins.find((p) => p.id === pinId)
+    dragStartPosRef.current = startPin ? { xPct: startPin.xPct, yPct: startPin.yPct } : null
     setDraggingPinId(pinId) // triggers the grabbing-cursor re-render; the ref alone drives the move/up logic
     // Best-effort only: keeps tracking the drag if the pointer slides off the
     // pin. Throws NotFoundError when the pointer isn't active, so it must
@@ -321,8 +327,10 @@ export default function FloorPlanPage() {
   async function handlePinPointerUp(e: React.PointerEvent) {
     const pinId = dragPinIdRef.current
     const finalPos = dragLatestPosRef.current
+    const startPos = dragStartPosRef.current
     dragPinIdRef.current = null
     dragLatestPosRef.current = null
+    dragStartPosRef.current = null
     setDraggingPinId(null)
 
     // Read everything needed for the save BEFORE releasing capture, and treat
@@ -338,9 +346,17 @@ export default function FloorPlanPage() {
     }
 
     // No finalPos means a tap, not a drag — handlePinTap's onClick covers it.
-    if (!pinId || !finalPos || !selectedProjectCode || !selectedFloor) return
+    if (!pinId || !finalPos || !selectedProjectCode || !selectedFloor || !floorPlan) return
+    const movedPin = pins.find((p) => p.id === pinId)
+    if (!movedPin || !startPos) return
     try {
-      await updatePinPosition(pinId, finalPos.xPct, finalPos.yPct)
+      await updatePinPosition(
+        pinId,
+        finalPos.xPct,
+        finalPos.yPct,
+        { xPct: startPos.xPct, yPct: startPos.yPct, locationId: movedPin.locationId, floorPlanId: floorPlan.id },
+        user?.name ?? 'Unknown',
+      )
       // Pins-only cache refresh — the floor plan image itself is untouched
       // by a drag, so no need to touch that half of the cache entry. Rebuilt
       // from finalPos rather than trusting `pins` to already reflect the last
@@ -381,10 +397,16 @@ export default function FloorPlanPage() {
   }
 
   async function handleConfirmDelete(pinId: string) {
-    if (!selectedProjectCode || !selectedFloor) return
+    if (!selectedProjectCode || !selectedFloor || !floorPlan) return
+    const pinToDelete = pins.find((p) => p.id === pinId)
+    if (!pinToDelete) return
     setError('')
     try {
-      await deletePin(pinId)
+      await deletePin(
+        pinId,
+        { xPct: pinToDelete.xPct, yPct: pinToDelete.yPct, locationId: pinToDelete.locationId, floorPlanId: floorPlan.id },
+        user?.name ?? 'Unknown',
+      )
       const nextPins = pins.filter((p) => p.id !== pinId)
       setPins(nextPins)
       updateCachedPins(selectedProjectCode, selectedFloor, nextPins)

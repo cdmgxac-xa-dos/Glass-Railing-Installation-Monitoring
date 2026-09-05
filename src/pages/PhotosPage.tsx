@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import type { LocationPhoto, PhotoCategory } from '../types'
 import { PHOTO_CATEGORIES } from '../types'
 import { addPhoto, getPhotosForLocation, removePhoto } from '../services/photoService'
+import { isSupabaseConfigured } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import { useLocationReference } from '../hooks/useLocationReference'
 import PageHeader from '../components/PageHeader'
@@ -33,9 +34,8 @@ export default function PhotosPage() {
     <div className="min-h-screen bg-[#F5F8FC]">
       <PageHeader title="Photos" subtitle={reference} />
       <div className="space-y-4 px-4 py-5">
-        <p className="text-xs text-xa-slate">
-          Photos are stored on this device for now. Once connected to Supabase Storage, they'll upload
-          automatically.
+        <p className="text-xs font-semibold text-xa-slate">
+          {isSupabaseConfigured ? '✓ Photos sync automatically to the project record.' : 'Offline · Photos are saved on this device only.'}
         </p>
         {PHOTO_CATEGORIES.map((category) => (
           <PhotoSection

@@ -46,6 +46,25 @@ const ROLE_CODE_MAP: Record<string, UserRole> = {
   owner: 'Owner',
 }
 
+// Human-facing role label per real role_code, for display only. Several
+// distinct role_codes collapse into the same permission-tier UserRole above
+// (e.g. field_pic/safety_officer/qc_officer all map to 'QC Inspector' so
+// permission checks stay simple) — without this, a Site PIC or Safety
+// Officer would see their badge misleadingly say "QC Inspector". Permission
+// checks must keep reading `role`/`roleCode` as before; this only changes
+// what's shown on screen.
+const DISPLAY_ROLE_LABELS: Record<string, string> = {
+  field_pic: 'Site PIC',
+  safety_officer: 'Safety Officer',
+}
+
+export function getDisplayRole(user: Pick<AppUser, 'role' | 'roleCode'>): string {
+  if (user.roleCode && DISPLAY_ROLE_LABELS[user.roleCode]) {
+    return DISPLAY_ROLE_LABELS[user.roleCode]
+  }
+  return user.role
+}
+
 // roleCode mirrors the real role_code each mock user would map from (see
 // ROLE_CODE_MAP above) — needed so mock-mode UI testing of role_code-level
 // checks (e.g. floor-plan pin management) behaves the same as real mode.
@@ -136,6 +155,37 @@ export async function changePassword(newPassword: string): Promise<void> {
   if (updateError) throw updateError
   const { error: rpcError } = await supabase!.rpc('mark_password_changed')
   if (rpcError) throw rpcError
+}
+
+// Sends a Supabase password-reset email. The link it contains lands the
+// user back on /reset-password with a temporary recovery session already
+// established (supabase-js reads the recovery token out of the URL
+// automatically) — ResetPasswordPage picks up from there via
+// completePasswordReset(). Mock mode has no email backend to call, so it
+// just simulates the round-trip delay; the login screen's confirmation
+// copy is intentionally the same either way so it never reveals whether an
+// email address exists in the system.
+export async function requestPasswordReset(email: string): Promise<void> {
+  if (!isSupabaseConfigured) {
+    await new Promise((r) => setTimeout(r, 400))
+    return
+  }
+  const { error } = await supabase!.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/reset-password`,
+  })
+  if (error) throw error
+}
+
+// Called from ResetPasswordPage once the user has followed the emailed
+// link (which establishes a temporary recovery session) and chosen a new
+// password. Signs the recovery session out afterward so they go through
+// the app's normal login() flow to get a fully hydrated AppUser rather
+// than silently continuing on the recovery session.
+export async function completePasswordReset(newPassword: string): Promise<void> {
+  if (!isSupabaseConfigured) return
+  const { error } = await supabase!.auth.updateUser({ password: newPassword })
+  if (error) throw error
+  await supabase!.auth.signOut()
 }
 
 export async function logout(): Promise<void> {

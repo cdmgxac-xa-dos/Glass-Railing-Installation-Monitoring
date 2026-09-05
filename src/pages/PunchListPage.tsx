@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import type { PunchListItem, PunchListStatus } from '../types'
 import { PUNCH_LIST_STATUSES } from '../types'
@@ -7,6 +7,7 @@ import { getLocationsByProject } from '../services/locationService'
 import { useAppData } from '../context/DataContext'
 import { useAuth } from '../context/AuthContext'
 import { useLocationReference } from '../hooks/useLocationReference'
+import { buildPunchDisplayIds } from '../utils/punchListDisplay'
 import PageHeader from '../components/PageHeader'
 import PunchListCard from '../components/PunchListCard'
 import StatusBadge from '../components/StatusBadge'
@@ -41,6 +42,14 @@ export default function PunchListPage() {
     setItems((prev) => prev.map((item) => (item.id === id ? { ...item, status } : item)))
   }
 
+  const displayIds = useMemo(
+    () =>
+      buildPunchDisplayIds(items, (locId) =>
+        locationId ? reference : (referenceByLocation[locId] ?? locId),
+      ),
+    [items, locationId, reference, referenceByLocation],
+  )
+
   return (
     <div className="min-h-screen bg-[#F5F8FC]">
       <PageHeader title="Punch List" subtitle={locationId ? reference : 'All open items'} />
@@ -53,6 +62,7 @@ export default function PunchListPage() {
           <div key={item.id}>
             <PunchListCard
               item={item}
+              displayId={displayIds[item.id]}
               locationLabel={locationId ? undefined : (referenceByLocation[item.locationId] ?? item.locationId)}
               onClick={() => setExpanded((cur) => (cur === item.id ? null : item.id))}
             />

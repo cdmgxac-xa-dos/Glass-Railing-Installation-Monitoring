@@ -98,6 +98,46 @@ const mockPins: LocationPin[] = []
 let mockPlanCounter = 1
 let mockPinCounter = 1
 
+// Pin position is master spatial data — every create/move/delete is logged
+// (old position, new position, who, when) rather than left silent, per the
+// UI/UX assessment's pin-permission recommendation. Real mode's gr_pin_audit_log
+// table (see supabase/09_pin_audit_log.sql) is append-only; mock mode keeps
+// an equivalent in-memory log so both modes behave the same, even though
+// nothing in the UI surfaces it yet.
+interface PinAuditEntry {
+  pinId: string
+  locationId: string
+  floorPlanId: string
+  action: 'create' | 'move' | 'delete'
+  oldXPct: number | null
+  oldYPct: number | null
+  newXPct: number | null
+  newYPct: number | null
+  changedBy: string
+  createdAt: string
+}
+const mockPinAuditLog: PinAuditEntry[] = []
+
+async function logPinAudit(entry: Omit<PinAuditEntry, 'createdAt'>): Promise<void> {
+  if (!isSupabaseConfigured) {
+    mockPinAuditLog.push({ ...entry, createdAt: new Date().toISOString() })
+    return
+  }
+
+  const { error } = await supabase!.from('gr_pin_audit_log').insert({
+    pin_id: entry.pinId,
+    location_id: entry.locationId,
+    floor_plan_id: entry.floorPlanId,
+    action: entry.action,
+    old_x_pct: entry.oldXPct,
+    old_y_pct: entry.oldYPct,
+    new_x_pct: entry.newXPct,
+    new_y_pct: entry.newYPct,
+    changed_by: entry.changedBy,
+  })
+  if (error) throw error
+}
+
 export async function getFloorPlan(projectCode: string, floorLevel: string): Promise<FloorPlan | null> {
   if (!isSupabaseConfigured) {
     return mockFloorPlans.find((p) => p.projectCode === projectCode && p.floorLevel === floorLevel) ?? null
@@ -208,6 +248,17 @@ export async function createPin(
       updatedAt: now,
     }
     mockPins.push(pin)
+    await logPinAudit({
+      pinId: pin.id,
+      locationId,
+      floorPlanId,
+      action: 'create',
+      oldXPct: null,
+      oldYPct: null,
+      newXPct: xPct,
+      newYPct: yPct,
+      changedBy: createdBy,
+    })
     return pin
   }
 
@@ -224,10 +275,28 @@ export async function createPin(
     .single()
 
   if (error) throw error
-  return mapPinRow(data as GrLocationPinRow)
+  const pin = mapPinRow(data as GrLocationPinRow)
+  await logPinAudit({
+    pinId: pin.id,
+    locationId,
+    floorPlanId,
+    action: 'create',
+    oldXPct: null,
+    oldYPct: null,
+    newXPct: xPct,
+    newYPct: yPct,
+    changedBy: createdBy,
+  })
+  return pin
 }
 
-export async function updatePinPosition(pinId: string, xPct: number, yPct: number): Promise<void> {
+export async function updatePinPosition(
+  pinId: string,
+  xPct: number,
+  yPct: number,
+  previousPosition: { xPct: number; yPct: number; locationId: string; floorPlanId: string },
+  changedBy: string,
+): Promise<void> {
   if (!isSupabaseConfigured) {
     const pin = mockPins.find((p) => p.id === pinId)
     if (pin) {
@@ -235,6 +304,17 @@ export async function updatePinPosition(pinId: string, xPct: number, yPct: numbe
       pin.yPct = yPct
       pin.updatedAt = new Date().toISOString()
     }
+    await logPinAudit({
+      pinId,
+      locationId: previousPosition.locationId,
+      floorPlanId: previousPosition.floorPlanId,
+      action: 'move',
+      oldXPct: previousPosition.xPct,
+      oldYPct: previousPosition.yPct,
+      newXPct: xPct,
+      newYPct: yPct,
+      changedBy,
+    })
     return
   }
 
@@ -244,17 +324,54 @@ export async function updatePinPosition(pinId: string, xPct: number, yPct: numbe
     .eq('id', pinId)
 
   if (error) throw error
+  await logPinAudit({
+    pinId,
+    locationId: previousPosition.locationId,
+    floorPlanId: previousPosition.floorPlanId,
+    action: 'move',
+    oldXPct: previousPosition.xPct,
+    oldYPct: previousPosition.yPct,
+    newXPct: xPct,
+    newYPct: yPct,
+    changedBy,
+  })
 }
 
-export async function deletePin(pinId: string): Promise<void> {
+export async function deletePin(
+  pinId: string,
+  pinBeforeDelete: { xPct: number; yPct: number; locationId: string; floorPlanId: string },
+  changedBy: string,
+): Promise<void> {
   if (!isSupabaseConfigured) {
     const idx = mockPins.findIndex((p) => p.id === pinId)
     if (idx >= 0) mockPins.splice(idx, 1)
+    await logPinAudit({
+      pinId,
+      locationId: pinBeforeDelete.locationId,
+      floorPlanId: pinBeforeDelete.floorPlanId,
+      action: 'delete',
+      oldXPct: pinBeforeDelete.xPct,
+      oldYPct: pinBeforeDelete.yPct,
+      newXPct: null,
+      newYPct: null,
+      changedBy,
+    })
     return
   }
 
   const { error } = await supabase!.from('gr_location_pins').delete().eq('id', pinId)
   if (error) throw error
+  await logPinAudit({
+    pinId,
+    locationId: pinBeforeDelete.locationId,
+    floorPlanId: pinBeforeDelete.floorPlanId,
+    action: 'delete',
+    oldXPct: pinBeforeDelete.xPct,
+    oldYPct: pinBeforeDelete.yPct,
+    newXPct: null,
+    newYPct: null,
+    changedBy,
+  })
 }
 
 // ---------------------------------------------------------------------------

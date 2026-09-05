@@ -60,7 +60,7 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-[#F5F8FC]">
-      <PageHeader title={summary.projectName} subtitle="Dashboard" showBack={false} />
+      <PageHeader title={summary.projectName} subtitle="Activity" showBack={false} />
 
       <div className="space-y-5 px-4 py-5">
         <div className="rounded-2xl border border-xa-line bg-white p-5 shadow-card">

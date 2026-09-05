@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import type { LocationStatus, RailingLocation } from '../types'
 import { LOCATION_STATUSES } from '../types'
 import { getLocations, updateLocationStatus } from '../services/locationService'
+import { getCompletionBlockers } from '../services/statusTransitionService'
 import { useAppData } from '../context/DataContext'
 import PageHeader from '../components/PageHeader'
 import StatusBadge from '../components/StatusBadge'
@@ -13,6 +14,8 @@ export default function KanbanBoardPage() {
   const { selectedProjectCode } = useAppData()
   const [locations, setLocations] = useState<RailingLocation[]>([])
   const [activeColumn, setActiveColumn] = useState<LocationStatus>('Not Started')
+  const [blockedCardId, setBlockedCardId] = useState<string | null>(null)
+  const [blockedReason, setBlockedReason] = useState('')
 
   useEffect(() => {
     if (!selectedProjectCode) {
@@ -30,6 +33,17 @@ export default function KanbanBoardPage() {
     const nextIndex = currentIndex + direction
     if (nextIndex < 0 || nextIndex >= columns.length) return
     const nextStatus = columns[nextIndex]
+
+    setBlockedCardId(null)
+    if (nextStatus === 'Completed') {
+      const blockers = await getCompletionBlockers(location.id)
+      if (blockers.length > 0) {
+        setBlockedCardId(location.id)
+        setBlockedReason(`Can't advance to Completed — ${blockers.join('; ')}.`)
+        return
+      }
+    }
+
     await updateLocationStatus(location.id, nextStatus)
     setLocations((prev) => prev.map((l) => (l.id === location.id ? { ...l, status: nextStatus } : l)))
   }
@@ -69,6 +83,10 @@ export default function KanbanBoardPage() {
               </div>
               <StatusBadge value={location.status} size="sm" />
             </div>
+
+            {blockedCardId === location.id && (
+              <p className="mt-2 text-xs font-medium text-red-600">{blockedReason}</p>
+            )}
 
             <div className="mt-3 flex items-center justify-between border-t border-xa-line pt-3">
               <button

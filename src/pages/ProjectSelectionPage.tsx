@@ -55,7 +55,7 @@ export default function ProjectSelectionPage() {
                 <ChevronRight size={20} className="shrink-0 text-slate-300" />
               </div>
               <div className="mt-3 border-t border-xa-line pt-2 text-xs font-semibold text-xa-slate">
-                {disabled ? 'No records yet' : `${project.totalLocations} railing locations`}
+                {disabled ? 'No records yet' : `${project.totalLocations} installation locations`}
               </div>
             </button>
           )

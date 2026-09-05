@@ -60,7 +60,7 @@ export default function OwnerDashboardPage() {
           <div className="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
             <div className="h-full rounded-full bg-xa-blue" style={{ width: `${summary.overallCompletionPct}%` }} />
           </div>
-          <p className="mt-2 text-xs text-xa-slate">{summary.totalLocations} total railing locations</p>
+          <p className="mt-2 text-xs text-xa-slate">{summary.totalLocations} total installation locations</p>
         </div>
 
         <div className="grid grid-cols-2 gap-3">

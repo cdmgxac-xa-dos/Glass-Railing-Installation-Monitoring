@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { Building2, ClipboardList, KanbanSquare, LayoutDashboard, LogOut, Info, ChevronRight, FileText } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useAppData } from '../context/DataContext'
+import { getDisplayRole } from '../services/authService'
 import PageHeader from '../components/PageHeader'
 
 // Kept in sync with each route's ProtectedRoute allowedRoles/allowedRoleCodes
@@ -39,7 +40,7 @@ export default function MorePage() {
           <p className="text-sm font-extrabold text-xa-navy">{user?.name}</p>
           <p className="text-xs text-xa-slate">{user?.email}</p>
           <span className="mt-2 inline-block rounded-full bg-xa-skyblue px-2.5 py-1 text-[11px] font-bold text-xa-blue">
-            {user?.role}
+            {user ? getDisplayRole(user) : ''}
           </span>
         </div>
 

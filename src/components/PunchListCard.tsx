@@ -4,11 +4,15 @@ import StatusBadge from './StatusBadge'
 
 interface PunchListCardProps {
   item: PunchListItem
+  // Human-readable punch ID for display (e.g. "GR-026-P02"). Falls back to
+  // item.id only if no display ID was computed — never show the raw
+  // database UUID that real-mode punch items carry as their id.
+  displayId?: string
   locationLabel?: string
   onClick?: () => void
 }
 
-export default function PunchListCard({ item, locationLabel, onClick }: PunchListCardProps) {
+export default function PunchListCard({ item, displayId, locationLabel, onClick }: PunchListCardProps) {
   return (
     <button
       onClick={onClick}
@@ -17,7 +21,7 @@ export default function PunchListCard({ item, locationLabel, onClick }: PunchLis
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-xs font-bold uppercase tracking-wide text-xa-slate">
-            {item.id} {locationLabel ? `· ${locationLabel}` : ''}
+            {displayId ?? item.id} {locationLabel ? `· ${locationLabel}` : ''}
           </p>
           <p className="mt-1 text-sm font-semibold text-slate-800">{item.issueDescription}</p>
         </div>
