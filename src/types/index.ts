@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// XA DOS — Glass Railing Installation Monitoring
+// XA Site Monitoring — Glass Railing Installation Monitoring
 // Shared domain types. This is the single source of truth for the data
 // model. Services return these shapes whether the data comes from mock
 // arrays (now) or Supabase (later) — pages never need to know the difference.

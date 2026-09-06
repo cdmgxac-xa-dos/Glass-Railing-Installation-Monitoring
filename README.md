@@ -1,4 +1,4 @@
-# XA DOS — Glass Railing Installation Monitoring
+# XA Site Monitoring — Glass Railing Installation Monitoring
 
 A standalone, mobile-first web app for tracking glass railing installation
 progress in the field — separate from the existing XA DOS Windows
@@ -90,14 +90,14 @@ Installation Checklist / Photos / QC Inspection / Punch List / Notes &
 Comments / Timeline / Update Status → Owner Dashboard → Kanban Production
 Board (optional view, management roles only).
 
-Bottom navigation: Home · Floors · Tasks · Dashboard · More. Owner
-Dashboard and the Kanban board are gated to Project Manager / Owner (Kanban
-also allows Foreman) and are hidden from Installer accounts via
-`ProtectedRoute`.
+Bottom navigation: Home · Floors · Tasks · Activity · More. Owner
+Dashboard and the Production Board are gated to Project Manager / Owner
+(Production Board also allows Foreman) and are hidden from Installer
+accounts via `ProtectedRoute`.
 
 ## Design
 
-Clean XA DOS navy-and-white palette (`#0B3D66` navy, `#1D6FE0` action blue,
-`#EAF2FE` tint) with Fieldwire-style task cards: large touch targets, bold
+Clean XA-approved palette (`#073F5F` navy, `#0A5C8A` action blue,
+`#E1EEF4` tint — XA Design Studio DR-0003) with Fieldwire-style task cards: large touch targets, bold
 status-colored badges (one distinct color per one of the six locked
 statuses), bottom tab bar, minimal typing anywhere in the field flow.

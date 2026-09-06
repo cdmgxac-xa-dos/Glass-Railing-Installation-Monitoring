@@ -54,7 +54,7 @@ export default function LoginPage() {
     return (
       <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center bg-white px-6 py-12">
         <div className="mb-8 text-center">
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-xa-blue">XA-DOS</p>
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-xa-blue">XA Site Monitoring</p>
           <h1 className="mt-1 font-display text-2xl font-extrabold text-xa-navy">Reset password</h1>
           <p className="mt-1 text-sm text-xa-slate">
             {resetSent
@@ -108,11 +108,11 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col justify-center bg-white px-6 py-12">
+    <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center bg-white px-6 py-12">
       <div className="mb-8 text-center">
-        <p className="text-xs font-bold uppercase tracking-[0.2em] text-xa-blue">XA-DOS</p>
+        <p className="text-xs font-bold uppercase tracking-[0.2em] text-xa-blue">XA Site Monitoring</p>
         <h1 className="mt-1 font-display text-2xl font-extrabold text-xa-navy">Sign in</h1>
-        <p className="mt-1 text-sm text-xa-slate">Field Monitoring</p>
+        <p className="mt-1 text-sm text-xa-slate">One Site. One View.</p>
       </div>
 
       <form onSubmit={handleLogin} className="space-y-4">

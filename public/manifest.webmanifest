@@ -1,7 +1,7 @@
 {
-  "name": "XA-DOS Field Monitoring",
-  "short_name": "XA-DOS",
-  "description": "Track every railing location from bracket to sign-off, floor by floor.",
+  "name": "XA Site Monitoring",
+  "short_name": "XA Site",
+  "description": "Track every installation location from bracket to sign-off, floor by floor.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
