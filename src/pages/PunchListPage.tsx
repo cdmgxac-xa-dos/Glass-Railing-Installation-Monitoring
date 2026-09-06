@@ -62,7 +62,7 @@ export default function PunchListPage() {
   )
 
   return (
-    <div className="min-h-screen bg-[#F5F8FC]">
+    <div className="min-h-screen bg-[#F5F7F8]">
       <PageHeader title="Punch List" subtitle={locationId ? reference : 'All open items'} />
 
       {!locationId && (

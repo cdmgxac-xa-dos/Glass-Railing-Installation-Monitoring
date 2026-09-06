@@ -26,7 +26,7 @@ export default function UnitTypeSelectionPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F5F8FC]">
+    <div className="min-h-screen bg-[#F5F7F8]">
       <PageHeader title="Select Unit Type" subtitle={`Floor ${selectedFloor ?? ''}`} />
       <div className="space-y-3 px-4 py-5">
         {unitTypes.map((ut) => (

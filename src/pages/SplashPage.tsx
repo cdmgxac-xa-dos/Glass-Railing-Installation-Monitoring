@@ -11,7 +11,7 @@ export default function SplashPage() {
         <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-white/10 backdrop-blur">
           <GanttChartSquare size={40} />
         </div>
-        <h1 className="text-3xl font-extrabold tracking-tight">XA-DOS</h1>
+        <h1 className="font-display text-3xl font-extrabold tracking-tight">XA-DOS</h1>
         <p className="mt-2 text-sm font-medium uppercase tracking-[0.2em] text-blue-200">
           Field Monitoring
         </p>

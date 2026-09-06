@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertTriangle } from 'lucide-react'
+import { CircleX } from 'lucide-react'
 import type { ProjectDashboardSummary } from '../types'
 import { getProjectDashboard } from '../services/locationService'
 import { useAppData } from '../context/DataContext'
@@ -42,8 +42,8 @@ export default function DashboardPage() {
 
   if (error) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-[#F5F8FC] p-6 text-center">
-        <AlertTriangle className="h-8 w-8 text-amber-500" />
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-[#F5F7F8] p-6 text-center">
+        <CircleX className="h-8 w-8 text-[#C0392F]" />
         <p className="text-sm font-semibold text-xa-navy">Couldn't load the dashboard</p>
         <p className="max-w-xs text-xs text-xa-slate">{error}</p>
         <button
@@ -59,14 +59,14 @@ export default function DashboardPage() {
   if (!summary) return <div className="p-6 text-sm text-xa-slate">Loading dashboard…</div>
 
   return (
-    <div className="min-h-screen bg-[#F5F8FC]">
+    <div className="min-h-screen bg-[#F5F7F8]">
       <PageHeader title={summary.projectName} subtitle="Activity" showBack={false} />
 
       <div className="space-y-5 px-4 py-5">
         <div className="rounded-2xl border border-xa-line bg-white p-5 shadow-card">
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold text-xa-slate">Overall progress</p>
-            <p className="text-2xl font-extrabold text-xa-navy">{summary.overallProgressPct}%</p>
+            <p className="font-display text-2xl font-extrabold text-xa-navy">{summary.overallProgressPct}%</p>
           </div>
           <div className="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
             <div

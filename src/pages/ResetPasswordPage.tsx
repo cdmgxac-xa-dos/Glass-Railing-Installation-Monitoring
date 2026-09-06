@@ -51,7 +51,7 @@ export default function ResetPasswordPage() {
   if (done) {
     return (
       <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center bg-white px-6 py-12 text-center">
-        <h1 className="text-xl font-extrabold text-xa-navy">Password updated</h1>
+        <h1 className="font-display text-xl font-extrabold text-xa-navy">Password updated</h1>
         <p className="mt-2 text-sm text-xa-slate">Sign in with your new password to continue.</p>
         <button
           onClick={() => navigate('/login', { replace: true })}
@@ -71,7 +71,7 @@ export default function ResetPasswordPage() {
     <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center bg-white px-6 py-12">
       <div className="mb-8 text-center">
         <p className="text-xs font-bold uppercase tracking-[0.2em] text-xa-blue">XA-DOS</p>
-        <h1 className="mt-1 text-2xl font-extrabold text-xa-navy">Set a new password</h1>
+        <h1 className="mt-1 font-display text-2xl font-extrabold text-xa-navy">Set a new password</h1>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">

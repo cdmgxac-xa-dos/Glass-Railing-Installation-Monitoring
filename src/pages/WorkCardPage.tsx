@@ -43,7 +43,7 @@ export default function WorkCardPage() {
   const isDoorsWindows = location.scope === 'DOORS_WINDOWS'
 
   return (
-    <div className="min-h-screen bg-[#F5F8FC]">
+    <div className="min-h-screen bg-[#F5F7F8]">
       <PageHeader
         title={location.reference ?? location.id}
         subtitle={`${location.floorLevel} · ${location.unitNo ?? location.windowTag ?? '—'}`}

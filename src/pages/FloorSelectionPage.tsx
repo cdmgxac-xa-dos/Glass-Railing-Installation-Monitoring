@@ -36,7 +36,7 @@ export default function FloorSelectionPage() {
   const specialFloors = floors.filter((f) => !STANDARD_FLOOR_PATTERN.test(f.floorLevel))
 
   return (
-    <div className="min-h-screen bg-[#F5F8FC]">
+    <div className="min-h-screen bg-[#F5F7F8]">
       <PageHeader title="Select Floor" subtitle="Choose a floor to view railing locations" />
 
       {standardFloors.length > 0 && (

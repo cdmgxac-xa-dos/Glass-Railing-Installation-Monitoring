@@ -26,11 +26,11 @@ export default function ProjectSelectionPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#F5F8FC] pb-6">
+    <div className="flex min-h-screen flex-col bg-[#F5F7F8] pb-6">
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col">
         <header className="bg-xa-navy px-5 pb-6 pt-10 text-white">
           <p className="text-xs font-semibold uppercase tracking-widest text-blue-200">Welcome{user ? `, ${user.name.split(' ')[0]}` : ''}</p>
-          <h1 className="mt-1 text-xl font-extrabold">Select a project</h1>
+          <h1 className="mt-1 font-display text-xl font-extrabold">Select a project</h1>
         </header>
 
         <div className="flex-1 space-y-3 px-5 pt-5">

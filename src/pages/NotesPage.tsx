@@ -26,7 +26,7 @@ export default function NotesPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#F5F8FC]">
+    <div className="flex min-h-screen flex-col bg-[#F5F7F8]">
       <PageHeader title="Notes & Comments" subtitle={reference} />
 
       <div className="flex-1 space-y-3 px-4 py-5">

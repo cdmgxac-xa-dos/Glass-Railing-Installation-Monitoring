@@ -44,7 +44,7 @@ export default function InstallationChecklistPage() {
   const pct = checklist && stages.length ? Math.round((completedCount / stages.length) * 100) : 0
 
   return (
-    <div className="min-h-screen bg-[#F5F8FC]">
+    <div className="min-h-screen bg-[#F5F7F8]">
       <PageHeader title="Installation Checklist" subtitle={reference} />
 
       <div className="px-4 pt-4">

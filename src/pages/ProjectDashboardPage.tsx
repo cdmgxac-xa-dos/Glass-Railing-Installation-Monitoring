@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  CheckCircle2,
+  CircleCheck,
   Clock,
   PauseCircle,
   ClipboardList,
@@ -9,7 +9,8 @@ import {
   Ruler,
   Layers,
   Circle,
-  AlertTriangle,
+  CircleAlert,
+  CircleX,
   Hourglass,
 } from 'lucide-react'
 import type { ProjectDashboardSummary } from '../types'
@@ -79,8 +80,8 @@ export default function ProjectDashboardPage() {
 
   if (error) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-[#F5F8FC] p-6 text-center">
-        <AlertTriangle className="h-8 w-8 text-amber-500" />
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-[#F5F7F8] p-6 text-center">
+        <CircleX className="h-8 w-8 text-[#C0392F]" />
         <p className="text-sm font-semibold text-xa-navy">Couldn't load the dashboard</p>
         <p className="max-w-xs text-xs text-xa-slate">{error}</p>
         <button
@@ -96,14 +97,14 @@ export default function ProjectDashboardPage() {
   if (!summary) return <div className="p-6 text-sm text-xa-slate">Loading dashboard…</div>
 
   return (
-    <div className="min-h-screen bg-[#F5F8FC]">
+    <div className="min-h-screen bg-[#F5F7F8]">
       <PageHeader title={summary.projectName} subtitle="Project dashboard" showBack={false} />
 
       <div className="space-y-5 px-4 py-5">
         <div className="rounded-2xl border border-xa-line bg-white p-5 shadow-card">
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold text-xa-slate">Overall progress</p>
-            <p className="text-2xl font-extrabold text-xa-navy">{summary.overallProgressPct}%</p>
+            <p className="font-display text-2xl font-extrabold text-xa-navy">{summary.overallProgressPct}%</p>
           </div>
           <div className="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
             <div
@@ -132,7 +133,7 @@ export default function ProjectDashboardPage() {
               )}
               {attention.overduePunch > 0 && (
                 <button onClick={() => navigate('/punch-list?overdue=1')} className="text-left">
-                  <MetricCard label="Overdue Punch" value={attention.overduePunch} icon={AlertTriangle} accent="red" />
+                  <MetricCard label="Overdue Punch" value={attention.overduePunch} icon={CircleAlert} accent="red" />
                 </button>
               )}
               {attention.stalled > 0 && (
@@ -147,7 +148,7 @@ export default function ProjectDashboardPage() {
         <div>
           <p className="mb-2 text-xs font-bold uppercase tracking-wide text-xa-slate">Locations by status</p>
           <div className="grid grid-cols-2 gap-3">
-            <MetricCard label="Completed" value={summary.statusCounts.Completed} icon={CheckCircle2} accent="emerald" />
+            <MetricCard label="Completed" value={summary.statusCounts.Completed} icon={CircleCheck} accent="emerald" />
             <MetricCard label="In Progress" value={summary.statusCounts['In Progress']} icon={Clock} accent="blue" />
             <MetricCard label="On Hold" value={summary.statusCounts['On Hold']} icon={PauseCircle} accent="violet" />
             <MetricCard label="Not Started" value={summary.statusCounts['Not Started']} icon={Circle} accent="slate" />

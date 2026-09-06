@@ -93,7 +93,7 @@ export default function UpdateStatusPage() {
   if (!location) return <div className="p-6 text-sm text-xa-slate">Loading…</div>
 
   return (
-    <div className="min-h-screen bg-[#F5F8FC]">
+    <div className="min-h-screen bg-[#F5F7F8]">
       <PageHeader title="Update Status" subtitle={location.reference ?? locationId} />
       <div className="space-y-3 px-4 py-5">
         <p className="text-xs font-bold uppercase tracking-wide text-xa-slate">Current status</p>

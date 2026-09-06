@@ -132,7 +132,7 @@ export default function ReportsPage() {
   const anySelected = Object.values(config).some(Boolean)
 
   return (
-    <div className="min-h-screen bg-[#F5F8FC] pb-8">
+    <div className="min-h-screen bg-[#F5F7F8] pb-8">
       <PageHeader title="Reports" subtitle="Generate & download project reports" />
       <div className="space-y-5 px-4 py-5">
         <div>

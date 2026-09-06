@@ -1,4 +1,4 @@
-import { Hammer, Search, AlertTriangle, CheckCircle2, ArrowRightLeft, Activity, type LucideIcon } from 'lucide-react'
+import { Hammer, Search, CircleAlert, CircleCheck, ArrowRightLeft, Activity, type LucideIcon } from 'lucide-react'
 import type { TimelineEvent } from '../types'
 
 interface TimelineItemProps {
@@ -26,11 +26,11 @@ const ACTION_ICON: Record<string, LucideIcon> = {
   'QC Inspection Requested': Search,
   'QC Failed': Search,
   'QC Passed': Search,
-  'Punch List Created': AlertTriangle,
-  'Punch Item Reopened': AlertTriangle,
-  'All Punch Items Closed': AlertTriangle,
-  Rectified: AlertTriangle,
-  Completed: CheckCircle2,
+  'Punch List Created': CircleAlert,
+  'Punch Item Reopened': CircleAlert,
+  'All Punch Items Closed': CircleAlert,
+  Rectified: CircleAlert,
+  Completed: CircleCheck,
 }
 
 function iconFor(action: string): LucideIcon {

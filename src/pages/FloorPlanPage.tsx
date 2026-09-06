@@ -476,7 +476,7 @@ export default function FloorPlanPage() {
         )}
         {visiblePins.map((pin) => {
           const loc = locationById.get(pin.locationId)
-          const color = loc ? STATUS_COLORS[loc.status] : '#8A99A8'
+          const color = loc ? STATUS_COLORS[loc.status] : STATUS_COLORS['Not Started']
           const canDrag = editMode && canManagePins
           return (
             <button
@@ -520,7 +520,7 @@ export default function FloorPlanPage() {
   }
 
   const content = (
-    <div className="relative flex h-full w-full flex-col bg-[#F5F8FC]">
+    <div className="relative flex h-full w-full flex-col bg-[#F5F7F8]">
       <header className="flex shrink-0 items-center gap-2 bg-xa-navy px-3 py-2 text-white">
         <button
           onClick={() => navigate(-1)}
@@ -723,7 +723,7 @@ export default function FloorPlanPage() {
   // those never see the rotate prompt at all.
   if (!isDesktopStyle && isPortrait) {
     return (
-      <div className="fixed inset-0 z-50 bg-[#F5F8FC]">
+      <div className="fixed inset-0 z-50 bg-[#F5F7F8]">
         <div
           className="fixed left-0 top-0 origin-top-left overflow-hidden"
           style={{

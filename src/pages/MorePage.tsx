@@ -32,7 +32,7 @@ export default function MorePage() {
     : false
 
   return (
-    <div className="min-h-screen bg-[#F5F8FC]">
+    <div className="min-h-screen bg-[#F5F7F8]">
       <PageHeader title="More" showBack={false} />
 
       <div className="space-y-4 px-4 py-5">

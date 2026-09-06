@@ -16,7 +16,7 @@ export default function TimelinePage() {
   }, [locationId])
 
   return (
-    <div className="min-h-screen bg-[#F5F8FC]">
+    <div className="min-h-screen bg-[#F5F7F8]">
       <PageHeader title="Timeline" subtitle={reference} />
       <div className="px-4 py-5">
         {events.length === 0 && (

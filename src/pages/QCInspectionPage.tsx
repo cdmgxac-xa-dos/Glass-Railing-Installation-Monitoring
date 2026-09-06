@@ -99,7 +99,7 @@ export default function QCInspectionPage() {
 
   if (submitted) {
     return (
-      <div className="min-h-screen bg-[#F5F8FC]">
+      <div className="min-h-screen bg-[#F5F7F8]">
         <PageHeader title="QC Inspection" subtitle={reference} />
         <div className="flex flex-col items-center gap-4 px-6 py-16 text-center">
           <div
@@ -127,7 +127,7 @@ export default function QCInspectionPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F5F8FC] pb-8">
+    <div className="min-h-screen bg-[#F5F7F8] pb-8">
       <PageHeader title="QC Inspection" subtitle={reference} />
 
       <div className="space-y-5 px-4 py-5">

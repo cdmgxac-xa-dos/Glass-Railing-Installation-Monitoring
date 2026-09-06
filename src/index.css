@@ -6,10 +6,12 @@ html, body, #root {
   height: 100%;
 }
 
+/* Approved neutral.fog (page background) and neutral.ink (primary text) —
+   XA Design Studio tokens.json v0.2.0 (DR-0003). */
 body {
   font-family: 'Inter', system-ui, sans-serif;
-  background-color: #F5F8FC;
-  color: #14263A;
+  background-color: #F5F7F8;
+  color: #0B1116;
   -webkit-tap-highlight-color: transparent;
 }
 

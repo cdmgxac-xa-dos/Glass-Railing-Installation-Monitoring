@@ -26,7 +26,7 @@ export default function PageHeader({ title, subtitle, onBack, showBack = true, r
           </button>
         )}
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-base font-bold leading-tight">{title}</h1>
+          <h1 className="truncate font-display text-base font-bold leading-tight">{title}</h1>
           {subtitle && <p className="truncate text-xs text-blue-100">{subtitle}</p>}
         </div>
         {right && <div className="shrink-0">{right}</div>}

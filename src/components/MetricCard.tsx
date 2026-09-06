@@ -29,7 +29,7 @@ export default function MetricCard({ label, value, icon: Icon, accent = 'navy', 
           </span>
         )}
       </div>
-      <p className="mt-2 text-2xl font-extrabold text-xa-navy">
+      <p className="mt-2 font-display text-2xl font-extrabold text-xa-navy">
         {value}
         {suffix && <span className="ml-1 text-sm font-semibold text-xa-slate">{suffix}</span>}
       </p>

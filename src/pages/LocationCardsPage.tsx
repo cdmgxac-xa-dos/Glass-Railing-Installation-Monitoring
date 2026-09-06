@@ -108,13 +108,13 @@ export default function LocationCardsPage() {
   const activeFilterCount = [statusFilter, teamFilter, unitTypeFilter].filter((f) => f !== 'All').length
 
   return (
-    <div className="min-h-screen bg-[#F5F8FC]">
+    <div className="min-h-screen bg-[#F5F7F8]">
       <PageHeader
         title={selectedScope === 'DOORS_WINDOWS' ? 'Doors & Windows Locations' : 'Railing Locations'}
         subtitle={`${selectedFloor ? `Floor ${selectedFloor}` : 'All floors'}${stalledOnly ? ' · Stalled > 2 days' : ''}`}
       />
 
-      <div className="sticky top-[57px] z-10 space-y-2 border-b border-xa-line bg-[#F5F8FC] px-4 py-3">
+      <div className="sticky top-[57px] z-10 space-y-2 border-b border-xa-line bg-[#F5F7F8] px-4 py-3">
         <div className="flex items-center gap-2 rounded-xl border border-xa-line bg-white px-3 py-2.5">
           <Search size={16} className="text-slate-500" />
           <input

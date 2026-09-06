@@ -89,7 +89,7 @@ export default function KanbanBoardPage() {
   const visibleCards = cardsInColumn.slice(0, visibleCount)
 
   return (
-    <div className="min-h-screen bg-[#F5F8FC]">
+    <div className="min-h-screen bg-[#F5F7F8]">
       <PageHeader title="Production Board" subtitle="Optional view" />
 
       <div className="border-b border-xa-line bg-white px-4 py-3">

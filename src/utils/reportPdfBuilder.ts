@@ -490,7 +490,7 @@ async function renderFloorPlanCanvas(
     const locationById = new Map(locations.map((l) => [l.id, l]))
     for (const pin of pins) {
       const loc = locationById.get(pin.locationId)
-      const [r, g, b] = hexToRgb(loc ? STATUS_COLORS[loc.status] : '#8A99A8')
+      const [r, g, b] = hexToRgb(loc ? STATUS_COLORS[loc.status] : STATUS_COLORS['Not Started'])
       const cx = pin.xPct * width
       const cy = pin.yPct * height
 

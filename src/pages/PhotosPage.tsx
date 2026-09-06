@@ -31,7 +31,7 @@ export default function PhotosPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F5F8FC]">
+    <div className="min-h-screen bg-[#F5F7F8]">
       <PageHeader title="Photos" subtitle={reference} />
       <div className="space-y-4 px-4 py-5">
         <p className="text-xs font-semibold text-xa-slate">

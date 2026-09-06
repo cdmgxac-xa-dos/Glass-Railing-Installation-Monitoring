@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
-  AlertTriangle,
+  CircleAlert,
   Camera,
   ClipboardCheck,
   Map,
@@ -28,7 +28,7 @@ import { formatExactTimestamp, formatRelativeTime } from '../utils/relativeTime'
 const TYPE_ICONS: Record<ActivityType, LucideIcon> = {
   status_change: RefreshCw,
   qc_inspection: ClipboardCheck,
-  punch_list: AlertTriangle,
+  punch_list: CircleAlert,
   photo_upload: Camera,
   pin_placed: MapPin,
   floor_plan_uploaded: Map,
