@@ -75,7 +75,7 @@ export default function MorePage() {
                 className="flex w-full items-center justify-between rounded-2xl border border-xa-line bg-white p-4 shadow-card"
               >
                 <span className="flex items-center gap-3 text-sm font-bold text-xa-navy">
-                  <KanbanSquare size={18} className="text-xa-blue" /> Production Board (Kanban)
+                  <KanbanSquare size={18} className="text-xa-blue" /> Production Board
                 </span>
                 <ChevronRight size={18} className="text-slate-300" />
               </button>

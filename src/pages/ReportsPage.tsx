@@ -21,6 +21,34 @@ const DEFAULT_CONFIG: ReportConfig = {
   includeFullDetailQcPunchHistory: false,
 }
 
+// Report presets (assessment section 37) — one-tap starting points for the
+// two report shapes people actually generate over and over, so the full
+// checkbox editor below isn't rebuilt from scratch every time. "Custom"
+// just resets to the plain starting config and leaves every box free to
+// toggle, same as opening this screen fresh.
+const DAILY_PRESET: ReportConfig = {
+  ...DEFAULT_CONFIG,
+  includeGeneralSummary: true,
+  includeByFloor: true,
+  includeByStatus: false,
+  includeByPunchList: true,
+}
+
+const WEEKLY_PRESET: ReportConfig = {
+  ...DEFAULT_CONFIG,
+  includeGeneralSummary: true,
+  includeByFloor: true,
+  includeByStatus: true,
+  includeByTeam: true,
+  includeByPunchList: true,
+}
+
+const REPORT_PRESETS: { label: string; config: ReportConfig }[] = [
+  { label: 'Daily Site Report', config: DAILY_PRESET },
+  { label: 'Weekly Accomplishment Report', config: WEEKLY_PRESET },
+  { label: 'Custom', config: DEFAULT_CONFIG },
+]
+
 const CHECKBOX_ITEMS: { key: keyof ReportConfig; label: string; indent?: boolean; requires?: keyof ReportConfig }[] = [
   { key: 'includeGeneralSummary', label: 'General summary (overall % + status counts)' },
   { key: 'includeByFloor', label: 'Breakdown by floor' },
@@ -107,6 +135,21 @@ export default function ReportsPage() {
     <div className="min-h-screen bg-[#F5F8FC] pb-8">
       <PageHeader title="Reports" subtitle="Generate & download project reports" />
       <div className="space-y-5 px-4 py-5">
+        <div>
+          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-xa-slate">Start from a preset</p>
+          <div className="flex flex-wrap gap-2">
+            {REPORT_PRESETS.map((preset) => (
+              <button
+                key={preset.label}
+                onClick={() => setConfig(preset.config)}
+                className="rounded-full border border-xa-line bg-white px-3 py-1.5 text-xs font-bold text-xa-slate active:bg-xa-skyblue active:text-xa-blue"
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="rounded-2xl border border-xa-line bg-white p-4 shadow-card">
           <p className="mb-3 text-sm font-bold text-xa-navy">What to include</p>
           <div className="space-y-1">

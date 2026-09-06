@@ -1,17 +1,39 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CheckCircle2, Clock, PauseCircle, ClipboardList, ListTodo, Ruler, Layers, Circle, AlertTriangle } from 'lucide-react'
+import {
+  CheckCircle2,
+  Clock,
+  PauseCircle,
+  ClipboardList,
+  ListTodo,
+  Ruler,
+  Layers,
+  Circle,
+  AlertTriangle,
+  Hourglass,
+} from 'lucide-react'
 import type { ProjectDashboardSummary } from '../types'
-import { getProjectDashboard } from '../services/locationService'
+import { getProjectDashboard, getLocationsByProject } from '../services/locationService'
+import { getPunchListForProject } from '../services/punchListService'
 import { useAppData } from '../context/DataContext'
 import MetricCard from '../components/MetricCard'
 import PageHeader from '../components/PageHeader'
-import FloorStatusDoughnut from '../components/FloorStatusDoughnut'
+import FloorProgressRow from '../components/FloorProgressRow'
+
+const STALLED_ACTIVE_STATUSES = ['In Progress', 'QC Inspection', 'Punch List']
+const STALLED_THRESHOLD_MS = 2 * 24 * 60 * 60 * 1000
+
+interface AttentionCounts {
+  onHold: number
+  overduePunch: number
+  stalled: number
+}
 
 export default function ProjectDashboardPage() {
   const navigate = useNavigate()
   const { selectedProjectCode, selectedScope } = useAppData()
   const [summary, setSummary] = useState<ProjectDashboardSummary | null>(null)
+  const [attention, setAttention] = useState<AttentionCounts | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
 
@@ -29,6 +51,27 @@ export default function ProjectDashboardPage() {
         setError(err instanceof Error ? err.message : 'Failed to load dashboard.')
       })
   }, [selectedProjectCode, selectedScope, navigate, reloadKey])
+
+  // Separate effect/state from the main summary — a failure here (e.g. no
+  // punch items table access) shouldn't block the rest of the dashboard
+  // from rendering.
+  useEffect(() => {
+    if (!selectedProjectCode || !summary) return
+    const today = new Date().toISOString().slice(0, 10)
+    Promise.all([getLocationsByProject(selectedProjectCode, selectedScope ?? undefined), getPunchListForProject(selectedProjectCode)])
+      .then(([locations, punchItems]) => {
+        const stalled = locations.filter(
+          (l) =>
+            STALLED_ACTIVE_STATUSES.includes(l.status) &&
+            Date.now() - new Date(l.updatedAt).getTime() > STALLED_THRESHOLD_MS,
+        ).length
+        const overduePunch = punchItems.filter(
+          (p) => p.status !== 'Closed' && p.targetCompletionDate && p.targetCompletionDate < today,
+        ).length
+        setAttention({ onHold: summary.statusCounts['On Hold'], overduePunch, stalled })
+      })
+      .catch((err: unknown) => console.error('Failed to load attention-required counts:', err))
+  }, [selectedProjectCode, selectedScope, summary])
 
   if (error) {
     return (
@@ -65,6 +108,37 @@ export default function ProjectDashboardPage() {
             />
           </div>
         </div>
+
+        {attention && (attention.onHold > 0 || summary.qcPending > 0 || attention.overduePunch > 0 || attention.stalled > 0) && (
+          <div>
+            <p className="mb-2 text-xs font-bold uppercase tracking-wide text-xa-slate">Attention required</p>
+            <div className="grid grid-cols-2 gap-3">
+              {attention.onHold > 0 && (
+                <button onClick={() => navigate(`/locations?status=${encodeURIComponent('On Hold')}`)} className="text-left">
+                  <MetricCard label="On Hold" value={attention.onHold} icon={PauseCircle} accent="violet" />
+                </button>
+              )}
+              {summary.qcPending > 0 && (
+                <button
+                  onClick={() => navigate(`/locations?status=${encodeURIComponent('QC Inspection')}`)}
+                  className="text-left"
+                >
+                  <MetricCard label="Awaiting QC" value={summary.qcPending} icon={ClipboardList} accent="amber" />
+                </button>
+              )}
+              {attention.overduePunch > 0 && (
+                <button onClick={() => navigate('/punch-list?overdue=1')} className="text-left">
+                  <MetricCard label="Overdue Punch" value={attention.overduePunch} icon={AlertTriangle} accent="red" />
+                </button>
+              )}
+              {attention.stalled > 0 && (
+                <button onClick={() => navigate('/locations?stalled=1')} className="text-left">
+                  <MetricCard label="Stalled > 2 Days" value={attention.stalled} icon={Hourglass} accent="slate" />
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         <div>
           <p className="mb-2 text-xs font-bold uppercase tracking-wide text-xa-slate">Locations by status</p>
@@ -104,9 +178,9 @@ export default function ProjectDashboardPage() {
 
         <div>
           <p className="mb-2 text-xs font-bold uppercase tracking-wide text-xa-slate">Accomplishment by floor</p>
-          <div className="space-y-3">
+          <div className="space-y-2">
             {summary.byFloorStatus.map((floor) => (
-              <FloorStatusDoughnut
+              <FloorProgressRow
                 key={floor.floorLevel}
                 floorLevel={floor.floorLevel}
                 statusCounts={floor.statusCounts}

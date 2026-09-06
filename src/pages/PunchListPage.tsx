@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import type { PunchListItem, PunchListStatus } from '../types'
 import { PUNCH_LIST_STATUSES } from '../types'
 import { getPunchListForLocation, getPunchListForProject, updatePunchListStatus } from '../services/punchListService'
@@ -15,11 +15,13 @@ import StatusBadge from '../components/StatusBadge'
 export default function PunchListPage() {
   const { locationId } = useParams()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { selectedProjectCode } = useAppData()
   const { user } = useAuth()
   const reference = useLocationReference(locationId ?? '')
   const [items, setItems] = useState<PunchListItem[]>([])
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [overdueOnly, setOverdueOnly] = useState(searchParams.get('overdue') === '1')
   // locationId -> reference, only needed for the all-locations view where
   // each card shows which location it belongs to.
   const [referenceByLocation, setReferenceByLocation] = useState<Record<string, string>>({})
@@ -50,15 +52,39 @@ export default function PunchListPage() {
     [items, locationId, reference, referenceByLocation],
   )
 
+  const today = new Date().toISOString().slice(0, 10)
+  const visibleItems = useMemo(
+    () =>
+      overdueOnly
+        ? items.filter((item) => item.status !== 'Closed' && item.targetCompletionDate && item.targetCompletionDate < today)
+        : items,
+    [items, overdueOnly, today],
+  )
+
   return (
     <div className="min-h-screen bg-[#F5F8FC]">
       <PageHeader title="Punch List" subtitle={locationId ? reference : 'All open items'} />
 
+      {!locationId && (
+        <div className="px-4 pt-4">
+          <button
+            onClick={() => setOverdueOnly((v) => !v)}
+            className={`rounded-full border px-3 py-1.5 text-xs font-bold ${
+              overdueOnly ? 'border-xa-blue bg-xa-skyblue text-xa-blue' : 'border-xa-line bg-white text-xa-slate'
+            }`}
+          >
+            Overdue only
+          </button>
+        </div>
+      )}
+
       <div className="space-y-3 px-4 py-5">
-        {items.length === 0 && (
-          <p className="py-10 text-center text-sm text-xa-slate">No punch-list items here. Nice and clean.</p>
+        {visibleItems.length === 0 && (
+          <p className="py-10 text-center text-sm text-xa-slate">
+            {overdueOnly ? 'No overdue punch items.' : 'No punch-list items here. Nice and clean.'}
+          </p>
         )}
-        {items.map((item) => (
+        {visibleItems.map((item) => (
           <div key={item.id}>
             <PunchListCard
               item={item}

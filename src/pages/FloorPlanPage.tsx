@@ -16,7 +16,7 @@ import {
   deletePin,
 } from '../services/floorPlanService'
 import { getLocationsByProject } from '../services/locationService'
-import { STATUS_COLORS } from '../constants/statusColors'
+import { STATUS_COLORS, STATUS_ORDER } from '../constants/statusColors'
 
 // Independent of gr_can_write()/field_ops edit level on purpose (mirrors the
 // DB's gr_can_manage_pins()) — Owner stays view-only here even though Owner
@@ -548,6 +548,17 @@ export default function FloorPlanPage() {
           </button>
         )}
       </header>
+
+      {floorPlan && (
+        <div className="flex shrink-0 items-center gap-3 overflow-x-auto border-b border-xa-line bg-white px-3 py-1.5 no-scrollbar">
+          {STATUS_ORDER.map((status) => (
+            <span key={status} className="flex shrink-0 items-center gap-1 text-[10px] font-semibold text-xa-slate">
+              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: STATUS_COLORS[status] }} />
+              {status}
+            </span>
+          ))}
+        </div>
+      )}
 
       {error && (
         <p className="shrink-0 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-600">{error}</p>

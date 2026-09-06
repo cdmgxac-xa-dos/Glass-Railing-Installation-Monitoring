@@ -20,6 +20,7 @@ export default function QCInspectionPage() {
   const [itemResults, setItemResults] = useState<Record<string, boolean>>({})
   const [result, setResult] = useState<QCResult | null>(null)
   const [issueDescription, setIssueDescription] = useState('')
+  const [descriptionTouched, setDescriptionTouched] = useState(false)
   const [priority, setPriority] = useState<Priority>('Medium')
   const [photoAttached, setPhotoAttached] = useState(false)
   const [photoUploading, setPhotoUploading] = useState(false)
@@ -38,6 +39,18 @@ export default function QCInspectionPage() {
   function toggleItem(key: string) {
     setItemResults((prev) => ({ ...prev, [key]: !prev[key] }))
   }
+
+  // Auto-drafts the punch item's issue description from whichever checklist
+  // items are unchecked, so a Failed result doesn't make the inspector
+  // retype what they already flagged above — see assessment section 26
+  // (QC failure -> punch integration). Only fills in while the field is
+  // still untouched; the moment they type anything themselves, their text
+  // is authoritative and this stops overwriting it.
+  useEffect(() => {
+    if (result !== 'Failed' || descriptionTouched) return
+    const failedLabels = items.filter((i) => itemResults[i.key] === false).map((i) => i.label)
+    setIssueDescription(failedLabels.length > 0 ? `Failed: ${failedLabels.join(', ')}` : '')
+  }, [result, itemResults, items, descriptionTouched])
 
   async function handlePhotoSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -170,7 +183,10 @@ export default function QCInspectionPage() {
               <label className="mb-1.5 block text-xs font-semibold text-red-700">Issue description (required)</label>
               <textarea
                 value={issueDescription}
-                onChange={(e) => setIssueDescription(e.target.value)}
+                onChange={(e) => {
+                  setDescriptionTouched(true)
+                  setIssueDescription(e.target.value)
+                }}
                 rows={3}
                 placeholder="Describe what failed and where"
                 className="w-full rounded-xl border border-red-200 bg-white px-3 py-2 text-sm outline-none focus:border-red-400"
