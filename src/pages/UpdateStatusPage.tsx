@@ -50,7 +50,14 @@ export default function UpdateStatusPage() {
     if (selected !== location.status) {
       if (selected === 'Completed') {
         setChecking(true)
-        const blockers = await getCompletionBlockers(locationId)
+        let blockers: string[]
+        try {
+          blockers = await getCompletionBlockers(locationId)
+        } catch (err) {
+          setChecking(false)
+          setError(err instanceof Error ? err.message : 'Could not verify completion requirements. Try again.')
+          return
+        }
         setChecking(false)
         if (blockers.length > 0) {
           setError(`Can't mark Completed — ${blockers.join('; ')}.`)

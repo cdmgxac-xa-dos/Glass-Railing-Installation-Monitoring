@@ -6,6 +6,7 @@ import { ASSIGNED_TEAMS, LOCATION_STATUSES } from '../types'
 import { getLocations, getUnitTypesInUse } from '../services/locationService'
 import { useAppData } from '../context/DataContext'
 import { useAuth } from '../context/AuthContext'
+import { isStalled } from '../utils/stalledLocations'
 import PageHeader from '../components/PageHeader'
 import LocationCard from '../components/LocationCard'
 
@@ -34,12 +35,6 @@ function defaultStatusFilterFor(role: string | undefined, roleCode: string | und
   if (roleCode === 'field_pic') return 'Active'
   return 'All'
 }
-
-// A location counts as "stalled" once it's been actively worked but hasn't
-// moved in a while — used by the Home screen's Attention Required card
-// (?stalled=1) so PIC/Owner can jump straight to what needs a nudge.
-const STALLED_ACTIVE_STATUSES: LocationStatus[] = ['In Progress', 'QC Inspection', 'Punch List']
-const STALLED_THRESHOLD_MS = 2 * 24 * 60 * 60 * 1000
 
 export default function LocationCardsPage() {
   const navigate = useNavigate()
@@ -85,11 +80,7 @@ export default function LocationCardsPage() {
       })
       .filter((l) => (teamFilter === 'All' ? true : l.assignedTeam === teamFilter))
       .filter((l) => (unitTypeFilter === 'All' ? true : l.unitType === unitTypeFilter))
-      .filter((l) => {
-        if (!stalledOnly) return true
-        if (!STALLED_ACTIVE_STATUSES.includes(l.status)) return false
-        return Date.now() - new Date(l.updatedAt).getTime() > STALLED_THRESHOLD_MS
-      })
+      .filter((l) => (stalledOnly ? isStalled(l) : true))
       .filter((l) => {
         if (!search.trim()) return true
         const q = search.toLowerCase()

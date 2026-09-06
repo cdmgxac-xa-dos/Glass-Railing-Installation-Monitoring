@@ -66,17 +66,23 @@ export default function KanbanBoardPage() {
     const nextStatus = columns[nextIndex]
 
     setBlockedCardId(null)
-    if (nextStatus === 'Completed') {
-      const blockers = await getCompletionBlockers(location.id)
-      if (blockers.length > 0) {
-        setBlockedCardId(location.id)
-        setBlockedReason(`Can't advance to Completed — ${blockers.join('; ')}.`)
-        return
+    try {
+      if (nextStatus === 'Completed') {
+        const blockers = await getCompletionBlockers(location.id)
+        if (blockers.length > 0) {
+          setBlockedCardId(location.id)
+          setBlockedReason(`Can't advance to Completed — ${blockers.join('; ')}.`)
+          return
+        }
       }
-    }
 
-    await updateLocationStatus(location.id, nextStatus)
-    setLocations((prev) => prev.map((l) => (l.id === location.id ? { ...l, status: nextStatus } : l)))
+      await updateLocationStatus(location.id, nextStatus)
+      setLocations((prev) => prev.map((l) => (l.id === location.id ? { ...l, status: nextStatus } : l)))
+    } catch (err) {
+      console.error('Failed to move card:', err)
+      setBlockedCardId(location.id)
+      setBlockedReason(err instanceof Error ? err.message : 'Could not update status. Try again.')
+    }
   }
 
   const cardsInColumn = filteredLocations.filter((l) => l.status === activeColumn)

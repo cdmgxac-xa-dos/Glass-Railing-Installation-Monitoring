@@ -16,12 +16,10 @@ import type { ProjectDashboardSummary } from '../types'
 import { getProjectDashboard, getLocationsByProject } from '../services/locationService'
 import { getPunchListForProject } from '../services/punchListService'
 import { useAppData } from '../context/DataContext'
+import { isStalled } from '../utils/stalledLocations'
 import MetricCard from '../components/MetricCard'
 import PageHeader from '../components/PageHeader'
 import FloorProgressRow from '../components/FloorProgressRow'
-
-const STALLED_ACTIVE_STATUSES = ['In Progress', 'QC Inspection', 'Punch List']
-const STALLED_THRESHOLD_MS = 2 * 24 * 60 * 60 * 1000
 
 interface AttentionCounts {
   onHold: number
@@ -60,13 +58,19 @@ export default function ProjectDashboardPage() {
     const today = new Date().toISOString().slice(0, 10)
     Promise.all([getLocationsByProject(selectedProjectCode, selectedScope ?? undefined), getPunchListForProject(selectedProjectCode)])
       .then(([locations, punchItems]) => {
-        const stalled = locations.filter(
-          (l) =>
-            STALLED_ACTIVE_STATUSES.includes(l.status) &&
-            Date.now() - new Date(l.updatedAt).getTime() > STALLED_THRESHOLD_MS,
-        ).length
+        // getPunchListForProject is project-wide (not scope-filtered), but
+        // this dashboard only shows one scope at a time — restrict punch
+        // items to the same scope-filtered location set `locations` already
+        // resolved, so a Doors & Windows punch item never inflates the
+        // Railings dashboard's Overdue Punch count, or vice versa.
+        const locationIdsInScope = new Set(locations.map((l) => l.id))
+        const stalled = locations.filter(isStalled).length
         const overduePunch = punchItems.filter(
-          (p) => p.status !== 'Closed' && p.targetCompletionDate && p.targetCompletionDate < today,
+          (p) =>
+            locationIdsInScope.has(p.locationId) &&
+            p.status !== 'Closed' &&
+            p.targetCompletionDate &&
+            p.targetCompletionDate < today,
         ).length
         setAttention({ onHold: summary.statusCounts['On Hold'], overduePunch, stalled })
       })

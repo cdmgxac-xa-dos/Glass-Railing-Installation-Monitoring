@@ -118,24 +118,34 @@ interface PinAuditEntry {
 }
 const mockPinAuditLog: PinAuditEntry[] = []
 
+// Best-effort: a pin's actual position write to gr_location_pins has
+// already succeeded by the time this is called, so a failure here (e.g.
+// the audit table migration hasn't run yet, or a transient RLS/network
+// error) must never surface as a failed pin move/create/delete to the
+// user — that would report a real write as broken and skip the local
+// cache update, desyncing the UI from a DB that's actually correct.
 async function logPinAudit(entry: Omit<PinAuditEntry, 'createdAt'>): Promise<void> {
   if (!isSupabaseConfigured) {
     mockPinAuditLog.push({ ...entry, createdAt: new Date().toISOString() })
     return
   }
 
-  const { error } = await supabase!.from('gr_pin_audit_log').insert({
-    pin_id: entry.pinId,
-    location_id: entry.locationId,
-    floor_plan_id: entry.floorPlanId,
-    action: entry.action,
-    old_x_pct: entry.oldXPct,
-    old_y_pct: entry.oldYPct,
-    new_x_pct: entry.newXPct,
-    new_y_pct: entry.newYPct,
-    changed_by: entry.changedBy,
-  })
-  if (error) throw error
+  try {
+    const { error } = await supabase!.from('gr_pin_audit_log').insert({
+      pin_id: entry.pinId,
+      location_id: entry.locationId,
+      floor_plan_id: entry.floorPlanId,
+      action: entry.action,
+      old_x_pct: entry.oldXPct,
+      old_y_pct: entry.oldYPct,
+      new_x_pct: entry.newXPct,
+      new_y_pct: entry.newYPct,
+      changed_by: entry.changedBy,
+    })
+    if (error) throw error
+  } catch (err) {
+    console.error('Failed to record pin audit log entry (pin write itself already succeeded):', err)
+  }
 }
 
 export async function getFloorPlan(projectCode: string, floorLevel: string): Promise<FloorPlan | null> {
