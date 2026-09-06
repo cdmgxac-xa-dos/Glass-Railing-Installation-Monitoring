@@ -9,7 +9,10 @@ export default {
           blue: '#1D6FE0',
           skyblue: '#EAF2FE',
           slate: '#4A5A6A',
-          line: '#DCE4EC',
+          // Bumped from #DCE4EC (assessment section 5) — card/input borders
+          // were too faint to read outdoors in direct sunlight; this stays
+          // subtle indoors while giving real edge definition in the field.
+          line: '#C7D2DC',
         },
         status: {
           notstarted: '#8A99A8',

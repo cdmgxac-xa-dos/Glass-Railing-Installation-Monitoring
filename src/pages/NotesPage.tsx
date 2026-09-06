@@ -30,12 +30,17 @@ export default function NotesPage() {
       <PageHeader title="Notes & Comments" subtitle={reference} />
 
       <div className="flex-1 space-y-3 px-4 py-5">
-        {notes.length === 0 && <p className="py-10 text-center text-sm text-xa-slate">No notes yet for this location.</p>}
+        {notes.length === 0 && (
+          <div className="py-10 text-center">
+            <p className="text-sm font-semibold text-xa-navy">No notes yet</p>
+            <p className="mt-1 text-xs text-xa-slate">Add a note below to log context for this location.</p>
+          </div>
+        )}
         {notes.map((note) => (
           <div key={note.id} className="rounded-2xl border border-xa-line bg-white p-3 shadow-card">
             <div className="flex items-center justify-between">
               <p className="text-xs font-bold text-xa-navy">{note.author}</p>
-              <p className="text-[11px] text-slate-400">{new Date(note.createdAt).toLocaleString()}</p>
+              <p className="text-[11px] text-slate-500">{new Date(note.createdAt).toLocaleString()}</p>
             </div>
             <p className="mt-1 text-sm text-slate-700">{note.text}</p>
           </div>

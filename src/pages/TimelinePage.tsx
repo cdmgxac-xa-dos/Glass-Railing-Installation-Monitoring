@@ -19,7 +19,14 @@ export default function TimelinePage() {
     <div className="min-h-screen bg-[#F5F8FC]">
       <PageHeader title="Timeline" subtitle={reference} />
       <div className="px-4 py-5">
-        {events.length === 0 && <p className="py-10 text-center text-sm text-xa-slate">No activity recorded yet.</p>}
+        {events.length === 0 && (
+          <div className="py-10 text-center">
+            <p className="text-sm font-semibold text-xa-navy">No activity recorded yet</p>
+            <p className="mt-1 text-xs text-xa-slate">
+              Status changes, QC inspections, punch items, and photo uploads for this location will show up here.
+            </p>
+          </div>
+        )}
         {events.map((event, i) => (
           <TimelineItem key={event.id} event={event} isLast={i === events.length - 1} />
         ))}

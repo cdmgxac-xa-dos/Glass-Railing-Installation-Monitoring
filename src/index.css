@@ -20,3 +20,10 @@ body {
 .safe-bottom {
   padding-bottom: env(safe-area-inset-bottom);
 }
+
+/* Outdoor-readability pass (assessment section 5): browser-default
+   placeholder color is too light for direct-sunlight field use. */
+::placeholder {
+  color: #6B7785;
+  opacity: 1;
+}

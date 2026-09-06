@@ -33,7 +33,7 @@ export default function LocationCard({ location, onClick }: LocationCardProps) {
           </p>
           <p className="truncate text-xs text-xa-slate">{location.floorLevel} &middot; {location.unitType}</p>
         </div>
-        <ChevronRight size={20} className="mt-1 shrink-0 text-slate-300" />
+        <ChevronRight size={20} className="mt-1 shrink-0 text-slate-400" />
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-xa-slate">
@@ -82,7 +82,7 @@ export default function LocationCard({ location, onClick }: LocationCardProps) {
 
       <div className="mt-3 flex items-center justify-between border-t border-xa-line pt-3">
         <StatusBadge value={location.status} size="sm" />
-        <span className="text-[11px] font-medium text-slate-400">{location.priority ?? 'Unassigned'} priority</span>
+        <span className="text-[11px] font-medium text-slate-500">{location.priority ?? 'Unassigned'} priority</span>
       </div>
     </button>
   )

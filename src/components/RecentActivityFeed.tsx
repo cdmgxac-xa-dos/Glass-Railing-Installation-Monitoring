@@ -70,7 +70,7 @@ function ActivityRow({ entry }: { entry: ActivityEntry }) {
             {entry.locationUnitNo && ` · ${unitLabel(entry.locationUnitNo)}`}
           </p>
         )}
-        <p className="mt-0.5 text-[11px] text-slate-400" title={exact}>
+        <p className="mt-0.5 text-[11px] text-slate-500" title={exact}>
           {formatRelativeTime(entry.timestamp)} · {exact}
         </p>
       </div>
@@ -105,7 +105,7 @@ export default function RecentActivityFeed({ projectCode }: { projectCode: strin
     <div>
       <div className="mb-2 flex items-baseline justify-between">
         <p className="text-xs font-bold uppercase tracking-wide text-xa-slate">Recent activity</p>
-        <p className="text-[11px] text-slate-400">Last {RECENT_ACTIVITY_WINDOW_DAYS} days</p>
+        <p className="text-[11px] text-slate-500">Last {RECENT_ACTIVITY_WINDOW_DAYS} days</p>
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-xa-line bg-white shadow-card">

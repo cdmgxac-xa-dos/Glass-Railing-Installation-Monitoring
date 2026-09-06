@@ -163,7 +163,7 @@ export default function ReportsPage() {
                   disabled={disabled}
                   className={`flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left text-sm ${item.indent ? 'ml-6' : ''} ${disabled ? 'opacity-40' : 'hover:bg-slate-50'}`}
                 >
-                  {checked ? <CheckSquare size={18} className="shrink-0 text-xa-blue" /> : <Square size={18} className="shrink-0 text-slate-300" />}
+                  {checked ? <CheckSquare size={18} className="shrink-0 text-xa-blue" /> : <Square size={18} className="shrink-0 text-slate-400" />}
                   <span className="text-slate-700">{item.label}</span>
                 </button>
               )

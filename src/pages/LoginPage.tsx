@@ -52,7 +52,7 @@ export default function LoginPage() {
 
   if (mode === 'reset') {
     return (
-      <div className="flex min-h-screen flex-col justify-center bg-white px-6 py-12">
+      <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center bg-white px-6 py-12">
         <div className="mb-8 text-center">
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-xa-blue">XA-DOS</p>
           <h1 className="mt-1 text-2xl font-extrabold text-xa-navy">Reset password</h1>
@@ -68,7 +68,7 @@ export default function LoginPage() {
             <div>
               <label className="mb-1.5 block text-xs font-semibold text-xa-slate">Email</label>
               <div className="flex items-center gap-2 rounded-xl border border-xa-line bg-white px-3 py-3 focus-within:border-xa-blue">
-                <Mail size={18} className="text-slate-400" />
+                <Mail size={18} className="text-slate-500" />
                 <input
                   type="email"
                   value={email}
@@ -119,7 +119,7 @@ export default function LoginPage() {
         <div>
           <label className="mb-1.5 block text-xs font-semibold text-xa-slate">Email</label>
           <div className="flex items-center gap-2 rounded-xl border border-xa-line bg-white px-3 py-3 focus-within:border-xa-blue">
-            <Mail size={18} className="text-slate-400" />
+            <Mail size={18} className="text-slate-500" />
             <input
               type="email"
               value={email}
@@ -134,7 +134,7 @@ export default function LoginPage() {
         <div>
           <label className="mb-1.5 block text-xs font-semibold text-xa-slate">Password</label>
           <div className="flex items-center gap-2 rounded-xl border border-xa-line bg-white px-3 py-3 focus-within:border-xa-blue">
-            <Lock size={18} className="text-slate-400" />
+            <Lock size={18} className="text-slate-500" />
             <input
               type="password"
               value={password}
@@ -168,7 +168,7 @@ export default function LoginPage() {
         </button>
       </form>
 
-      <p className="mt-8 text-center text-xs text-slate-400">
+      <p className="mt-8 text-center text-xs text-slate-500">
         Sign in with your XA DOS account.
       </p>
     </div>

@@ -97,7 +97,9 @@ export default function LocationCardsPage() {
           l.id.toLowerCase().includes(q) ||
           (l.reference ?? '').toLowerCase().includes(q) ||
           (l.unitNo ?? '').toLowerCase().includes(q) ||
-          (l.windowTag ?? '').toLowerCase().includes(q)
+          (l.windowTag ?? '').toLowerCase().includes(q) ||
+          (l.assignedTeam ?? '').toLowerCase().includes(q) ||
+          l.unitType.toLowerCase().includes(q)
         )
       })
       .sort((a, b) => {
@@ -123,16 +125,16 @@ export default function LocationCardsPage() {
 
       <div className="sticky top-[57px] z-10 space-y-2 border-b border-xa-line bg-[#F5F8FC] px-4 py-3">
         <div className="flex items-center gap-2 rounded-xl border border-xa-line bg-white px-3 py-2.5">
-          <Search size={16} className="text-slate-400" />
+          <Search size={16} className="text-slate-500" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by ID or unit no."
+            placeholder="Search ID, unit no., team, or unit type"
             className="w-full text-sm outline-none"
           />
           {search && (
             <button onClick={() => setSearch('')}>
-              <X size={14} className="text-slate-400" />
+              <X size={14} className="text-slate-500" />
             </button>
           )}
         </div>
@@ -200,7 +202,24 @@ export default function LocationCardsPage() {
 
       <div className="space-y-3 px-4 py-4">
         {filtered.length === 0 && (
-          <p className="py-10 text-center text-sm text-xa-slate">No locations match your filters.</p>
+          <div className="py-10 text-center">
+            <p className="text-sm font-semibold text-xa-navy">No locations match</p>
+            <p className="mt-1 text-xs text-xa-slate">Try a different search term or remove a filter.</p>
+            {(activeFilterCount > 0 || search || stalledOnly) && (
+              <button
+                onClick={() => {
+                  setStatusFilter('All')
+                  setTeamFilter('All')
+                  setUnitTypeFilter('All')
+                  setSearch('')
+                  if (stalledOnly) navigate('/locations', { replace: true })
+                }}
+                className="mt-3 rounded-full border border-xa-line bg-white px-4 py-2 text-xs font-bold text-xa-blue"
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
         )}
         {filtered.map((location) => (
           <LocationCard key={location.id} location={location} onClick={() => navigate(`/locations/${location.id}`)} />

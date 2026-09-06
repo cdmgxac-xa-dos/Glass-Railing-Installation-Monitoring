@@ -23,7 +23,7 @@ export default function UnitTypeRow({ unitType, locationCount, onClick }: UnitTy
           {locationCount} location{locationCount === 1 ? '' : 's'}
         </p>
       </div>
-      <ChevronRight size={20} className="text-slate-300" />
+      <ChevronRight size={20} className="text-slate-400" />
     </button>
   )
 }

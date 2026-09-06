@@ -80,9 +80,18 @@ export default function PunchListPage() {
 
       <div className="space-y-3 px-4 py-5">
         {visibleItems.length === 0 && (
-          <p className="py-10 text-center text-sm text-xa-slate">
-            {overdueOnly ? 'No overdue punch items.' : 'No punch-list items here. Nice and clean.'}
-          </p>
+          <div className="py-10 text-center">
+            <p className="text-sm font-semibold text-xa-navy">
+              {overdueOnly ? 'No overdue punch items' : 'No open punch items'}
+            </p>
+            <p className="mt-1 text-xs text-xa-slate">
+              {overdueOnly
+                ? 'Nothing is past its target date right now.'
+                : locationId
+                  ? 'QC failures and manually added items for this location will appear here.'
+                  : 'QC failures and manually added items across the project will appear here.'}
+            </p>
+          </div>
         )}
         {visibleItems.map((item) => (
           <div key={item.id}>

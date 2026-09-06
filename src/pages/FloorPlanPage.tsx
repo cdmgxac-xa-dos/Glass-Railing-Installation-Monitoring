@@ -676,11 +676,11 @@ export default function FloorPlanPage() {
             <div className="mb-3 flex items-center justify-between">
               <p className="text-sm font-bold text-xa-navy">Place pin — select a location</p>
               <button onClick={() => setPicker(null)} aria-label="Close">
-                <X size={18} className="text-slate-400" />
+                <X size={18} className="text-slate-500" />
               </button>
             </div>
             <div className="mb-3 flex items-center gap-2 rounded-xl border border-xa-line px-3 py-2">
-              <Search size={16} className="text-slate-400" />
+              <Search size={16} className="text-slate-500" />
               <input
                 autoFocus
                 value={pickerQuery}

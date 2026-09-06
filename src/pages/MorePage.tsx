@@ -52,7 +52,7 @@ export default function MorePage() {
             <span className="flex items-center gap-3 text-sm font-bold text-xa-navy">
               <Building2 size={18} className="text-xa-blue" /> Switch Project
             </span>
-            <ChevronRight size={18} className="text-slate-300" />
+            <ChevronRight size={18} className="text-slate-400" />
           </button>
         </div>
 
@@ -66,7 +66,7 @@ export default function MorePage() {
                 <span className="flex items-center gap-3 text-sm font-bold text-xa-navy">
                   <LayoutDashboard size={18} className="text-xa-blue" /> Owner Dashboard
                 </span>
-                <ChevronRight size={18} className="text-slate-300" />
+                <ChevronRight size={18} className="text-slate-400" />
               </button>
             )}
             {canSeeKanban && (
@@ -77,7 +77,7 @@ export default function MorePage() {
                 <span className="flex items-center gap-3 text-sm font-bold text-xa-navy">
                   <KanbanSquare size={18} className="text-xa-blue" /> Production Board
                 </span>
-                <ChevronRight size={18} className="text-slate-300" />
+                <ChevronRight size={18} className="text-slate-400" />
               </button>
             )}
             {canSeePunchList && (
@@ -88,7 +88,7 @@ export default function MorePage() {
                 <span className="flex items-center gap-3 text-sm font-bold text-xa-navy">
                   <ClipboardList size={18} className="text-xa-blue" /> Punch List (all locations)
                 </span>
-                <ChevronRight size={18} className="text-slate-300" />
+                <ChevronRight size={18} className="text-slate-400" />
               </button>
             )}
             {canSeeReports && (
@@ -99,7 +99,7 @@ export default function MorePage() {
                 <span className="flex items-center gap-3 text-sm font-bold text-xa-navy">
                   <FileText size={18} className="text-xa-blue" /> Reports
                 </span>
-                <ChevronRight size={18} className="text-slate-300" />
+                <ChevronRight size={18} className="text-slate-400" />
               </button>
             )}
           </div>
@@ -109,7 +109,7 @@ export default function MorePage() {
           <span className="flex items-center gap-3 text-sm font-bold text-xa-navy">
             <Info size={18} className="text-xa-blue" /> About XA DOS
           </span>
-          <ChevronRight size={18} className="text-slate-300" />
+          <ChevronRight size={18} className="text-slate-400" />
         </button>
 
         <button

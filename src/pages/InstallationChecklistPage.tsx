@@ -59,7 +59,7 @@ export default function InstallationChecklistPage() {
         </div>
       </div>
 
-      <div className="space-y-3 px-4 py-5">
+      <div className="space-y-2 px-4 py-5">
         {checklist &&
           stages.map((stage, i) => (
             <ChecklistItem

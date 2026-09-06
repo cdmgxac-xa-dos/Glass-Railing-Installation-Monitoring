@@ -38,7 +38,7 @@ export default function ChangePasswordPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col justify-center bg-white px-6 py-12">
+    <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center bg-white px-6 py-12">
       <div className="mb-8 text-center">
         <p className="text-xs font-bold uppercase tracking-[0.2em] text-xa-blue">XA-DOS</p>
         <h1 className="mt-1 text-2xl font-extrabold text-xa-navy">Set a new password</h1>
@@ -51,7 +51,7 @@ export default function ChangePasswordPage() {
         <div>
           <label className="mb-1.5 block text-xs font-semibold text-xa-slate">New Password</label>
           <div className="flex items-center gap-2 rounded-xl border border-xa-line bg-white px-3 py-3 focus-within:border-xa-blue">
-            <Lock size={18} className="text-slate-400" />
+            <Lock size={18} className="text-slate-500" />
             <input
               type="password"
               value={newPassword}
@@ -66,7 +66,7 @@ export default function ChangePasswordPage() {
         <div>
           <label className="mb-1.5 block text-xs font-semibold text-xa-slate">Confirm Password</label>
           <div className="flex items-center gap-2 rounded-xl border border-xa-line bg-white px-3 py-3 focus-within:border-xa-blue">
-            <Lock size={18} className="text-slate-400" />
+            <Lock size={18} className="text-slate-500" />
             <input
               type="password"
               value={confirmPassword}

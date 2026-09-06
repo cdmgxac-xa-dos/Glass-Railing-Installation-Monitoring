@@ -20,7 +20,7 @@ export default function MobileBottomNav() {
             end={end}
             className={({ isActive }) =>
               `flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-semibold transition ${
-                isActive ? 'text-xa-blue' : 'text-slate-400'
+                isActive ? 'text-xa-blue' : 'text-slate-500'
               }`
             }
           >
